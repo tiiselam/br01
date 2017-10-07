@@ -16,7 +16,7 @@ AS
 BEGIN
 	if isnull((select sum(o.perdblnc) from GL10110 O
 	where o.YEAR1=@Year1),0)+isnull((select sum(o.perdblnc) from GL10111 O
-	where o.YEAR1=@Year1)=0,0)
+	where o.YEAR1=@Year1),0)=0
 	begin
 		set @comentario='Balanço OK'
 		set @error=0
