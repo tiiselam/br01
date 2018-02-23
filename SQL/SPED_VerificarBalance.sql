@@ -23,16 +23,17 @@ BEGIN
 			(select sum(o.perdblnc) 
 			from GL10111 O
 			where o.YEAR1=@Year1),0) = 0
-
 	begin
 		set @comentario='Balanço OK'
 		set @error=0
 	end
 	else 
 	begin
-		set @Comentario='Erro Balanço'
+		set @Comentario='Error Balanço'
 		set @error=1
 	end
 END
 
-GRANT EXECUTE ON SPED_VerificarBalance TO DYNGRP
+go
+GRANT EXECUTE ON SPED_VerificarBalance TO DYNGRP;
+go
