@@ -14,6 +14,7 @@ create PROCEDURE [dbo].[SPED_VerificarBalance]
 	@error as int out
 AS
 BEGIN
+
 	if isnull(
 			(select sum(o.perdblnc) 
 			from GL10110 O
@@ -22,13 +23,14 @@ BEGIN
 			(select sum(o.perdblnc) 
 			from GL10111 O
 			where o.YEAR1=@Year1),0) = 0
+
 	begin
-		set @comentario='Balanço OK'
+		set @comentario='BalanÃ§o OK'
 		set @error=0
 	end
 	else 
 	begin
-		set @Comentario='Erro Balanço'
+		set @Comentario='Erro BalanÃ§o'
 		set @error=1
 	end
 END
