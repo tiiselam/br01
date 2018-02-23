@@ -6,9 +6,9 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 -- =============================================
--- Author:		<Author,,Name>
--- Create date: <Create Date,,>
--- Description:	<Description,,>
+--Propósito. Genera el archivo SPED de Brasil
+--...2016 lt Elaboración
+--23/2/18 jcf Corrige sección j930
 -- =============================================
 create PROCEDURE [dbo].[SPED_ArchivoTXT] 
 	@IdCompañia varchar (8),
@@ -917,29 +917,30 @@ DEALLOCATE Resultado_Cursor;
 
 set @contador=@contador+1
 INSERT INTO spedtbl9000 (LINEA,seccion, datos) 
-	select @contador+1,'J900',isnull('|J900|'+	---REG,
-		'TERMO DE ENCERRAMENTO|'+	---DNRC_ENCER
-		ltrim(rtrim(STR(CONF.SPED_NUM_ORD)))+'|'+	--- NUM_ORD,
-		'G|'+	--- NAT_LIVRO,
-		rtrim(ltrim(com.CMPNYNAM))+'|'+		---NOME
-		'*|'+	---QTD_LIN
-		rtrim(replace(convert(char,convert(datetime,@fechadesde,102),103),'/',''))+'|'+	---DT_INI_ESCR,
+	select @contador+1,'J900',isnull('|J900|'+		---REG,
+		'TERMO DE ENCERRAMENTO|'+					---DNRC_ENCER
+		ltrim(rtrim(STR(CONF.SPED_NUM_ORD)))+'|'+	---NUM_ORD,
+		'G|'+										---NAT_LIVRO,
+		rtrim(ltrim(com.CMPNYNAM))+'|'+				---NOME
+		'*|'+										---QTD_LIN
+		rtrim(replace(convert(char,convert(datetime,@fechadesde,102),103),'/',''))+'|'+		---DT_INI_ESCR,
 		rtrim(replace(convert(char,convert(datetime,@FechaHasta,102),103),'/',''))+'|','') 	---DT_FIN_ESCR,
 	 from dynamics.dbo.SY01500  com 
 	left join SPEDtbl001 conf on com.INTERID =conf.INTERID
 set @contador=@contador+1
 INSERT INTO spedtbl9000 (LINEA,seccion, datos) 
-	select @contador+1,'J930',isnull('|J930|'+	---REG,
-		rtrim(ltrim(conf.SPED_IDENT_NOM))+'|'+		---SIDENT_NOM
+	select @contador+1,'J930',isnull('|J930|'+		---REG,
+		rtrim(ltrim(conf.SPED_IDENT_NOM))+'|'+		---IDENT_NOM
 		rtrim(ltrim(conf.SPED_IDENT_CPF))+'|'+		---CPF
-		rtrim(ltrim(conf.SPED_IDENT_QUALIF))+'|'+		---IDENT_QUALIF
-		rtrim(ltrim(conf.SPED_COD_ASSIM))+'|'+		---COD_ASSIM
-		rtrim(ltrim(conf.SPED_IND_CRC))+'|'+				---IND_CRC 
-		rtrim(ltrim(conf.sped_email))+'|'+							----EMAIL
-		rtrim(ltrim(conf.SPED_FONE))+'|'+							----FONE
-		'SP|'+														----UF_CRC
-		LTRIM(RTRIM(CONF.SPED_NUM_SEQ_CRC))+'|'+					----NUM_SEQ_CRC
-		rtrim(replace(convert(char,convert(datetime,conf.sped_DT_CRC,102),103),'/',''))+'|' 	---DT_CRC,
+		rtrim(ltrim(conf.SPED_IDENT_QUALIF))+'|'+	---IDENT_QUALIF
+		rtrim(ltrim(conf.SPED_COD_ASSIM))+'|'+		---COD_ASSIN
+		rtrim(ltrim(conf.SPED_IND_CRC))+'|'+		---IND_CRC 
+		rtrim(ltrim(conf.sped_email))+'|'+			---EMAIL
+		rtrim(ltrim(conf.SPED_FONE))+'|'+			---FONE
+		'SP|'+										---UF_CRC
+		LTRIM(RTRIM(CONF.SPED_NUM_SEQ_CRC))+'|'+	---NUM_SEQ_CRC
+		rtrim(replace(convert(char,convert(datetime,conf.sped_DT_CRC,102),103),'/',''))+'|'+ 	---DT_CRC,
+		'S|'										---IND_RESP_LEGAL
 		,'')	
 	 from SPEDtbl002 conf
 	 where conf.INTERID =@IdCompañia
