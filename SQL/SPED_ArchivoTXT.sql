@@ -1,6 +1,6 @@
-
-/****** Object:  StoredProcedure [dbo].[SPED_ArchivoTXT]    Script Date: 6/14/2017 7:43:10 AM ******/
-
+USE [GBRA]
+GO
+/****** Object:  StoredProcedure [dbo].[SPED_ArchivoTXT]    Script Date: 5/9/2018 7:29:19 AM ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -10,7 +10,7 @@ GO
 -- Create date: <Create Date,,>
 -- Description:	<Description,,>
 -- =============================================
-create PROCEDURE [dbo].[SPED_ArchivoTXT] 
+ALTER PROCEDURE [dbo].[SPED_ArchivoTXT] 
 	@IdCompañia varchar (8),
 	@FechaDesde varchar(10),
 	@FechaHasta varchar(10)
@@ -21,7 +21,7 @@ BEGIN
 	---CREATE TABLE spedtbl9000 (LINEA datetime,SECCION VARCHAR(4),DATOS VARCHAR(8000))
 	-- SET NOCOUNT ON added to prevent extra result sets from
 	-- interfering with SELECT statements.
-	SET NOCOUNT ON;
+	SET NOCOUNT off;
 
     -- Insert statements for procedure here
 
@@ -97,8 +97,8 @@ declare PlanCuentas_Cursor cursor for
 		SPED_COD_CTA_SUP,
 		SPED_CTA,
 		gc.ACTDESCR, ---isnull(pc.ACTDESCR,gc.ACTDESCR) AS ACTDESCR,
-		isnull(PC.USERDEF1,'') as userdef1,
-		isnull(PC.USERDEF2,''),
+		replace(replace(isnull(PC.USERDEF1,''),'-','.'),' ','') as userdef1,
+		'',---isnull(PC.USERDEF2,''),
 		isnull(pc.ACTNUMBR_1,'')
 	from SPEDtbl004 gc 
 	left join GL00100 pc on pc.USERDEF1=gc.SPED_COD_CTA
@@ -133,7 +133,9 @@ begin
 				RTRIM(@ACTDESCR)+'|',''))
 	if @SPED_NIVEL=4 ---@SPED_IND_CTA='A'
 	begin
-		declare Cuentas_gp cursor for (select ACTNUMBR_1,USERDEF1,cgp.ACTDESCR from gl00100 cgp where left(userdef1,10)=@sped_cod_cta group by ACTNUMBR_1,userdef1,ACTDESCR)
+		declare Cuentas_gp cursor for (select ACTNUMBR_1,USERDEF1,max(cgp.ACTDESCR) as ACTDESCR  from gl00100 cgp 
+		where left(userdef1,10)=@sped_cod_cta 
+		group by ACTNUMBR_1,userdef1) ---,ACTDESCR)
 		order by ACTNUMBR_1
 		open Cuentas_gp
 		fetch next from cuentas_gp into @codigogp,@userdef1,@Actdescr
@@ -175,7 +177,7 @@ set @contador=@contador+1
 declare @sgmtid varchar(10)
 declare @dscriptn varchar(80)
 declare @fecha datetime
-declare cc_cursor cursor for (select cc.SGMNTID,cc.DSCRIPTN,cc.DEX_ROW_TS from GL40200 cc where SGMTNUMB=2)
+declare cc_cursor cursor for (select cc.SGMNTID,cc.DSCRIPTN,cc.DEX_ROW_TS from GL40200 cc where SGMTNUMB=2 AND cc.SGMNTID<>'')
 open cc_cursor
 fetch next from cc_cursor into @sgmtid,@dscriptn,@fecha
 WHILE @@FETCH_STATUS = 0  
@@ -284,8 +286,12 @@ begin
 	declare total_asientos_cursor cursor for
 	(select JRNENTRY,TRXDATE,sum(CRDTAMNT),sum(DEBITAMT) from GL30000 AC 
 		where ac.HSTYEAR=@vanio and ac.PERIODID = @vper
-		group by ac.HSTYEAR,ac.PERIODID,ac.JRNENTRY,ac.TRXDATE)
-	open total_asientos_cursor
+		group by ac.HSTYEAR,ac.PERIODID,ac.JRNENTRY,ac.TRXDATE
+	union
+	select JRNENTRY,TRXDATE,sum(CRDTAMNT),sum(DEBITAMT) from GL20000 AC 
+		where ac.OPENYEAR=@vanio and ac.PERIODID = @vper 
+		group by ac.OPENYEAR,ac.PERIODID,ac.JRNENTRY,ac.TRXDATE ) order by JRNENTRY
+	open total_asientos_cursor 
 	fetch next from total_asientos_cursor into @jrnentry,@trxdate,@crdtamnt,@debitamt
 	while @@fetch_status =0
 	begin
@@ -310,7 +316,21 @@ begin
 			from GL30000 AC
 			left join gl00100 pc on pc.actindx=ac.ACTINDX
 			WHERE ac.JRNENTRY =@JRNENTRY
-			fetch next from total_asientos_cursor into @jrnentry,@trxdate,@crdtamnt,@debitamt
+		insert into spedtbl9000 (linea,seccion,datos)
+		select @contador+1,'I250',
+				isnull('|I250|'+						----REG
+				rtrim(ltrim(left(pc.USERDEF1,10)))+'.'+rtrim(pc.actnumbr_1)+'|'+	----COD_CTA
+				rtrim(ltrim(pc.ACTNUMBR_2))+'|'+ ---COD_CCUS
+				isnull(LTRIM(RTRIM(REPLACE(cast(convert(decimal(10,2),ac.DEBITAMT+ac.CRDTAMNT)AS nvarchar),'.',','))),'0,00')+'|'+			----VL_DC
+				CASE WHEN ac.DEBITAMT>0 THEN 'D' ELSE 'C' END +'|'+			----IND_DC
+				LTRIM(RTRIM(str(ac.jrnentry)))+'|'+			----NUM_ARQ
+				'|'+			----COD_HIST_PAD
+				LTRIM(RTRIM(ac.refrence))+'|'+			----HIST
+				'|'	,'')		----COD_PART
+			from GL20000 AC
+			left join gl00100 pc on pc.actindx=ac.ACTINDX
+			WHERE ac.JRNENTRY =@JRNENTRY
+		fetch next from total_asientos_cursor into @jrnentry,@trxdate,@crdtamnt,@debitamt
 	end
 	CLOSE total_asientos_cursor;  
 	DEALLOCATE total_asientos_cursor;
@@ -336,8 +356,13 @@ DEALLOCATE periodos_cursor;
 			LEFT JOIN GL00100 PC ON PC.ACTINDX=ac.ACTINDX
 			LEFT JOIN SPEDtbl004 J ON J.SPED_COD_CTA=pc.USERDEF1
 			where j.SPED_COD_NAT=4 and ac.YEAR1=@vanio and PERIODID<>0
+			group by AC.ACTINDX union select AC.ACTINDX,case when sum(ac.CRDTAMNT)>sum(AC.DEBITAMT) then sum(aC.CRDTAMNT)-sum(AC.DEBITAMT) else 0 end as d,
+					case when sum(ac.CRDTAMNT)<sum(AC.DEBITAMT) then sum(aC.DEBITAMT)-sum(AC.CRDTAMNT) else 0 end as c
+			FROM GL10110 AC
+			LEFT JOIN GL00100 PC ON PC.ACTINDX=ac.ACTINDX
+			LEFT JOIN SPEDtbl004 J ON J.SPED_COD_CTA=pc.USERDEF1
+			where j.SPED_COD_NAT=4 and ac.YEAR1=@vanio and PERIODID<>0
 			group by AC.ACTINDX) r)) as nvarchar),'.',','))),'0,00')+'|E|','')
-
 		set @contador=@contador+1
 		insert into spedtbl9000 (linea,seccion,datos)
 		values (@contador+1,'I250',
@@ -366,6 +391,23 @@ DEALLOCATE periodos_cursor;
 			left join gl00100 pc on pc.actindx=ac.ACTINDX
 			LEFT JOIN SPEDtbl004 J ON J.SPED_COD_CTA=pc.USERDEF1
 			where (j.SPED_COD_NAT=4) and ac.HSTYEAR=@vanio
+			group by pc.USERDEF1,pc.ACTNUMBR_1,pc.ACTNUMBR_2 ---rtrim(ltrim(left(pc.USERDEF1,10)))+'.'+rtrim(pc.actnumbr_1),pc.ACTNUMBR_2
+			order by rtrim(left(pc.USERDEF1,10))+'.'+pc.ACTNUMBR_1,pc.ACTNUMBR_2
+		insert into spedtbl9000 (linea,seccion,datos)
+		select @contador+1,'I250',
+				isnull('|I250|'+						----REG
+				rtrim(ltrim(left(pc.USERDEF1,10)))+'.'+rtrim(pc.actnumbr_1)+'|'+	----COD_CTA
+				rtrim(ltrim(pc.ACTNUMBR_2))+'|'+ ---COD_CCUS
+				isnull(LTRIM(RTRIM(REPLACE(cast(convert(decimal(10,2),abs(abs(sum(ac.DEBITAMT))-abs(sum(ac.CRDTAMNT)))) AS nvarchar),'.',','))),'0,00')+'|'+			----VL_DC
+				CASE WHEN abs(sum(ac.DEBITAMT))>abs(sum(ac.CRDTAMNT)) THEN 'C' ELSE 'D' END +'|'+			----IND_DC
+				rtrim(replace(convert(char,convert(datetime,@FechaHasta,102),103),'/',''))+'|'+			----NUM_ARQ
+				'|'+			----COD_HIST_PAD
+				'Apuração do Resultado|'+			----HIST
+				'|'	,'')		----COD_PART
+			from GL20000 AC
+			left join gl00100 pc on pc.actindx=ac.ACTINDX
+			LEFT JOIN SPEDtbl004 J ON J.SPED_COD_CTA=pc.USERDEF1
+			where (j.SPED_COD_NAT=4) and ac.OPENYEAR=@vanio
 			group by pc.USERDEF1,pc.ACTNUMBR_1,pc.ACTNUMBR_2 ---rtrim(ltrim(left(pc.USERDEF1,10)))+'.'+rtrim(pc.actnumbr_1),pc.ACTNUMBR_2
 			order by rtrim(left(pc.USERDEF1,10))+'.'+pc.ACTNUMBR_1,pc.ACTNUMBR_2
 set @contador=@contador+1
@@ -939,7 +981,8 @@ INSERT INTO spedtbl9000 (LINEA,seccion, datos)
 		rtrim(ltrim(conf.SPED_FONE))+'|'+							----FONE
 		'SP|'+														----UF_CRC
 		LTRIM(RTRIM(CONF.SPED_NUM_SEQ_CRC))+'|'+					----NUM_SEQ_CRC
-		rtrim(replace(convert(char,convert(datetime,conf.sped_DT_CRC,102),103),'/',''))+'|' 	---DT_CRC,
+		rtrim(replace(convert(char,convert(datetime,conf.sped_DT_CRC,102),103),'/',''))+'|'+ 	---DT_CRC,
+		RTRIM(ltrim(conf.SPED_IND_RESP_LEGAL))+'|'
 		,'')	
 	 from SPEDtbl002 conf
 	 where conf.INTERID =@IdCompañia
@@ -991,7 +1034,9 @@ values (@contador+1,
 	'9999',
 	'|9999|'+
 	isnull(ltrim(rtrim(cast(convert(int,(select count(*)+1 from spedtbl9000)) as nvarchar))),'0')+'|')
-
+set @contador=(select COUNT(linea) from SPEDtbl9000)
+update SPEDtbl9000 set datos=replace(datos,'*',cast(@contador as varchar)) where datos like '|I030|%'
+update SPEDtbl9000 set datos=replace(datos,'*',cast(@contador as varchar)) where datos like '|J900|%'
 ----select * from spedtbl9000 order by linea
 
 end
