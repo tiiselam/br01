@@ -6,12 +6,12 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 -- =============================================
--- Author:		<Author,,Name>
--- Create date: <Create Date,,>
--- Description:	<Description,,>
+--Propósito. Genera el archivo SPED de Brasil
+--...2016 lt Elaboración
+--23/2/18 jcf Corrige sección j930
 -- =============================================
 ALTER PROCEDURE [dbo].[SPED_ArchivoTXT] 
-	@IdCompa�ia varchar (8),
+	@IdCompañia varchar (8),
 	@FechaDesde varchar(10),
 	@FechaHasta varchar(10)
 AS
@@ -35,7 +35,7 @@ INSERT INTO spedtbl9000 (LINEA,seccion, datos)
 		rtrim(isnull(com.TAXREGTN,''))+'|'+	---CNPJ, C6
 		rtrim(isnull(conf.speduf,''))+'|'+		--- UF, C7
 		rtrim(isnull(conf.spedIE,''))+'|'+		---IE, C8
-		rtrim(isnull(com.COUNTY,''))+'|'+		--- AS C�D_MUN, C9
+		rtrim(isnull(com.COUNTY,''))+'|'+		--- AS CÓD_MUN, C9
 		rtrim(isnull(conf.sped_IM,''))+'|'+	--- AS IM, C10
 		rtrim( case when conf.SPED_IND_SIT_ESP=0 then '' else str(conf.SPED_IND_SIT_ESP) end)+'|','')+	--- AS IND_SIT_ESP C11
 		'0|1|0|||0|0||N|'
@@ -48,7 +48,7 @@ insert into spedtbl9000 (linea, seccion, datos)
 insert into spedtbl9000 (linea,seccion, datos)	
 	values(@contador+2,'0007',isnull('|0007|'+	--- AS REG,
 		   'SP|'+		---  AS COD_ENT_REF,
-		   'Livro Di�rio Completo|',''))	--- AS C�D_INSCR			---SECCION 0007
+		   'Livro Diário Completo|',''))	--- AS CÓD_INSCR			---SECCION 0007
 insert into spedtbl9000 (linea,seccion, datos)	
 	values( @contador+3,'0990',isnull('|0990|'+	--- AS REG,
 			'4|',''))		--- AS QTD_LIN_0							---SECCION 0990
@@ -58,7 +58,7 @@ insert into spedtbl9000 (linea,seccion, datos)
 insert into spedtbl9000 (linea,seccion, datos)	
 	values( @contador+5,'I010',isnull('|I010|'+	--- AS REG,
 			'G|'+		--- AS IND_ESC,
-			'4.00|'	,''))	--- AS C�D_VER_LC						---SECCION I010
+			'4.00|'	,''))	--- AS CÓD_VER_LC						---SECCION I010
 			set @contador=@contador+5
 insert into spedtbl9000 (linea,seccion, datos)	
 	SELECT @contador+1,'I030',
@@ -76,7 +76,7 @@ insert into spedtbl9000 (linea,seccion, datos)
 			rtrim(replace(convert(char,convert(datetime,@FechaHasta,102),103),'/',''))+'|' 
 	from dynamics.dbo.SY01500  com1 
 	left join SPEDtbl001 conf on com1.INTERID =conf.INTERID
-	where com1.INTERID =@IdCompa�ia
+	where com1.INTERID =@IdCompañia
 declare @docdate as DATETIME
 declare @SPED_COD_NAT as varchar(2)
 declare @sped_cod_cta as varchar(50)
@@ -127,9 +127,9 @@ begin
 				rtrim(replace(convert(char,convert(datetime,@docdate,103),103),'/',''))+'|'+	--- AS DT_ALT,
 				RTRIM(LTRIM(@SPED_COD_NAT))+'|'+	--- AS COD_NAT,
 				rtrim(ltrim(@SPED_IND_CTA))+'|'+	--- AS IND_CTA,
-				LTRIM(STR(@SPED_NIVEL))+'|'+	--- AS N�VEL,
-				RTRIM(@sped_cod_cta)+'|'+	---  AS C�D_CTA,
-				RTRIM(@SPED_COD_CTA_SUP)+'|'+	--- AS C�D_CTA_SUP,
+				LTRIM(STR(@SPED_NIVEL))+'|'+	--- AS NÍVEL,
+				RTRIM(@sped_cod_cta)+'|'+	---  AS CÓD_CTA,
+				RTRIM(@SPED_COD_CTA_SUP)+'|'+	--- AS CÓD_CTA_SUP,
 				RTRIM(@ACTDESCR)+'|',''))
 	if @SPED_NIVEL=4 ---@SPED_IND_CTA='A'
 	begin
@@ -148,17 +148,17 @@ begin
 						rtrim(replace(convert(char,convert(datetime,@docdate,103),103),'/',''))+'|'+	--- AS DT_ALT,
 						RTRIM(LTRIM(@SPED_COD_NAT))+'|'+	--- AS COD_NAT,
 						'A|'+	--- AS IND_CTA,
-						'5|'+	--- AS N�VEL,
-						RTRIM(@sped_cod_cta)+'.'+rtrim(@codigogp)+'|'+	---  AS C�D_CTA,
-						RTRIM(@SPED_COD_CTA)+'|'+	--- AS C�D_CTA_SUP,
+						'5|'+	--- AS NÍVEL,
+						RTRIM(@sped_cod_cta)+'.'+rtrim(@codigogp)+'|'+	---  AS CÓD_CTA,
+						RTRIM(@SPED_COD_CTA)+'|'+	--- AS CÓD_CTA_SUP,
 						RTRIM(@ACTDESCR)+'|',''))
 			set @contador=@contador+1
 			insert into spedtbl9000 (linea,seccion, datos)	
 				VALUES (@contador+1,'I051',
 						isnull('|I051|'+	--- AS REG,
-						'1|'+	--- AS C�D_ENT _REF
-						'|'+	--- AS C�D_CCUS,
-						rtrim(LTRIM(@USERDEF1))+'|',''))	--- C�D_CTA_REF
+						'1|'+	--- AS CÓD_ENT _REF
+						'|'+	--- AS CÓD_CCUS,
+						rtrim(LTRIM(@USERDEF1))+'|',''))	--- CÓD_CTA_REF
 			set @contador=@contador+1
 			insert into spedtbl9000 (linea,seccion, datos)	
 				VALUES (@contador+1,'I052',
@@ -373,7 +373,7 @@ DEALLOCATE periodos_cursor;
 				CASE WHEN abs(@DEBITAMT)>abs(@CRDTAMNT) THEN 'D' ELSE 'C' END +'|'+			----IND_DC
 				rtrim(replace(convert(char,convert(datetime,@FechaHasta,102),103),'/',''))+'|'+			----NUM_ARQ
 				'|'+			----COD_HIST_PAD
-				'Apura��o do Resultado|'+			----HIST
+				'Apuração do Resultado|'+			----HIST
 				'|'	,''))		----COD_PART
 		set @contador=@contador+1
 		insert into spedtbl9000 (linea,seccion,datos)
@@ -385,7 +385,7 @@ DEALLOCATE periodos_cursor;
 				CASE WHEN abs(sum(ac.DEBITAMT))>abs(sum(ac.CRDTAMNT)) THEN 'C' ELSE 'D' END +'|'+			----IND_DC
 				rtrim(replace(convert(char,convert(datetime,@FechaHasta,102),103),'/',''))+'|'+			----NUM_ARQ
 				'|'+			----COD_HIST_PAD
-				'Apura��o do Resultado|'+			----HIST
+				'Apuração do Resultado|'+			----HIST
 				'|'	,'')		----COD_PART
 			from GL30000 AC
 			left join gl00100 pc on pc.actindx=ac.ACTINDX
@@ -402,7 +402,7 @@ DEALLOCATE periodos_cursor;
 				CASE WHEN abs(sum(ac.DEBITAMT))>abs(sum(ac.CRDTAMNT)) THEN 'C' ELSE 'D' END +'|'+			----IND_DC
 				rtrim(replace(convert(char,convert(datetime,@FechaHasta,102),103),'/',''))+'|'+			----NUM_ARQ
 				'|'+			----COD_HIST_PAD
-				'Apura��o do Resultado|'+			----HIST
+				'Apuração do Resultado|'+			----HIST
 				'|'	,'')		----COD_PART
 			from GL20000 AC
 			left join gl00100 pc on pc.actindx=ac.ACTINDX
@@ -499,7 +499,7 @@ g.SPED_NIVEL,
 g.SPED_COD_NAT,
 g.ACTDESCR,
 case SPED_NIVEL when 1 then
-	abs(isnull((select sum(s.DEBITAMT-s.CRDTAMNT)						-----saldo inicial en a�o abierto
+	abs(isnull((select sum(s.DEBITAMT-s.CRDTAMNT)						-----saldo inicial en año abierto
 	from GL10111 s
 	left join GL00100 pc on s.ACTINDX = pc.actindx
 	left join SPEDtbl004 n5 on n5.SPED_COD_CTA = pc.userdef1
@@ -959,20 +959,20 @@ DEALLOCATE Resultado_Cursor;
 
 set @contador=@contador+1
 INSERT INTO spedtbl9000 (LINEA,seccion, datos) 
-	select @contador+1,'J900',isnull('|J900|'+	---REG,
-		'TERMO DE ENCERRAMENTO|'+	---DNRC_ENCER
-		ltrim(rtrim(STR(CONF.SPED_NUM_ORD)))+'|'+	--- NUM_ORD,
-		'G|'+	--- NAT_LIVRO,
-		rtrim(ltrim(com.CMPNYNAM))+'|'+		---NOME
-		'*|'+	---QTD_LIN
-		rtrim(replace(convert(char,convert(datetime,@fechadesde,102),103),'/',''))+'|'+	---DT_INI_ESCR,
+	select @contador+1,'J900',isnull('|J900|'+		---REG,
+		'TERMO DE ENCERRAMENTO|'+					---DNRC_ENCER
+		ltrim(rtrim(STR(CONF.SPED_NUM_ORD)))+'|'+	---NUM_ORD,
+		'G|'+										---NAT_LIVRO,
+		rtrim(ltrim(com.CMPNYNAM))+'|'+				---NOME
+		'*|'+										---QTD_LIN
+		rtrim(replace(convert(char,convert(datetime,@fechadesde,102),103),'/',''))+'|'+		---DT_INI_ESCR,
 		rtrim(replace(convert(char,convert(datetime,@FechaHasta,102),103),'/',''))+'|','') 	---DT_FIN_ESCR,
 	 from dynamics.dbo.SY01500  com 
 	left join SPEDtbl001 conf on com.INTERID =conf.INTERID
 set @contador=@contador+1
 INSERT INTO spedtbl9000 (LINEA,seccion, datos) 
-	select @contador+1,'J930',isnull('|J930|'+	---REG,
-		rtrim(ltrim(conf.SPED_IDENT_NOM))+'|'+		---SIDENT_NOM
+	select @contador+1,'J930',isnull('|J930|'+		---REG,
+		rtrim(ltrim(conf.SPED_IDENT_NOM))+'|'+		---IDENT_NOM
 		rtrim(ltrim(conf.SPED_IDENT_CPF))+'|'+		---CPF
 		rtrim(ltrim(conf.SPED_IDENT_QUALIF))+'|'+		---IDENT_QUALIF
 		rtrim(ltrim(conf.SPED_COD_ASSIM))+'|'+		---COD_ASSIM
@@ -982,10 +982,10 @@ INSERT INTO spedtbl9000 (LINEA,seccion, datos)
 		'SP|'+														----UF_CRC
 		LTRIM(RTRIM(CONF.SPED_NUM_SEQ_CRC))+'|'+					----NUM_SEQ_CRC
 		rtrim(replace(convert(char,convert(datetime,conf.sped_DT_CRC,102),103),'/',''))+'|'+ 	---DT_CRC,
-		RTRIM(ltrim(conf.SPED_IND_RESP_LEGAL))+'|'
+		RTRIM(ltrim(conf.SPED_IND_RESP_LEGAL))+'|' ---IND_RESP_LEGAL
 		,'')	
 	 from SPEDtbl002 conf
-	 where conf.INTERID =@IdCompa�ia
+	 where conf.INTERID =@IdCompañia
 set @contador=@contador+1
 INSERT INTO spedtbl9000 (LINEA,seccion, datos) 
 	values (@contador+1,
