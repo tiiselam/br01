@@ -1,4 +1,6 @@
-/****** Object:  StoredProcedure [dbo].[SPED_Total_Saldo_Cta]    Script Date: 6/14/2017 7:44:52 AM ******/
+USE [GBRA]
+GO
+/****** Object:  StoredProcedure [dbo].[SPED_Total_Saldo_Cta]    Script Date: 5/3/2018 12:06:27 PM ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -8,7 +10,7 @@ GO
 -- Create date: <Create Date,,>
 -- Description:	<Description,,>
 -- =============================================
-create PROCEDURE [dbo].[SPED_Total_Saldo_Cta]
+ALTER PROCEDURE [dbo].[SPED_Total_Saldo_Cta]
 	@actindx as int,
 	@year1 as int,
 	@periodid as int,
@@ -33,9 +35,12 @@ BEGIN
 		FROM gl10111
 		WHERE PERIODID<>0 and (YEAR1=@year1 and  PERIODID=@periodid) and ACTINDX=@actindx),0)+
 		case when @periodid=12 and @Nat=4 then 
-		(SELECT isnull(CASE WHEN SUM(DEBITAMT)>SUM(CRDTAMNT) THEN SUM(DEBITAMT)-SUM(CRDTAMNT) ELSE 0 END,0)
+		isnull((SELECT isnull(CASE WHEN SUM(DEBITAMT)>SUM(CRDTAMNT) THEN SUM(DEBITAMT)-SUM(CRDTAMNT) ELSE 0 END,0)
 		FROM gl10111
-		WHERE PERIODID<>0 and (YEAR1=@year1 and  PERIODID<=@periodid) and ACTINDX=@actindx) 
+		WHERE PERIODID<>0 and (YEAR1=@year1 and  PERIODID<=@periodid) and ACTINDX=@actindx),0)+
+		isnull((SELECT isnull(CASE WHEN SUM(DEBITAMT)>SUM(CRDTAMNT) THEN SUM(DEBITAMT)-SUM(CRDTAMNT) ELSE 0 END,0)
+		FROM gl10110
+		WHERE PERIODID<>0 and (YEAR1=@year1 and  PERIODID<=@periodid) and ACTINDX=@actindx),0)
 		else 0 end
 
 		set @debito=(SELECT isnull(abs(sum(DEBITAMT)),0)
@@ -45,9 +50,13 @@ BEGIN
 		FROM gl10111
 		WHERE PERIODID<>0 and (YEAR1=@year1 and  PERIODID=@periodid) and ACTINDX=@actindx),0)+
 		case when @periodid=12 and @Nat=4 then 
-		(SELECT isnull(CASE WHEN SUM(CRDTAMNT)>SUM(DEBITAMT) THEN SUM(CRDTAMNT)-SUM(DEBITAMT) ELSE 0 END,0)
+		isnull((SELECT isnull(CASE WHEN SUM(CRDTAMNT)>SUM(DEBITAMT) THEN SUM(CRDTAMNT)-SUM(DEBITAMT) ELSE 0 END,0)
 		FROM gl10111
-		WHERE PERIODID<>0 and (YEAR1=@year1 and  PERIODID<=@periodid) and ACTINDX=@actindx) else 0 end
+		WHERE PERIODID<>0 and (YEAR1=@year1 and  PERIODID<=@periodid) and ACTINDX=@actindx),0)+
+		isnull((SELECT isnull(CASE WHEN SUM(CRDTAMNT)>SUM(DEBITAMT) THEN SUM(CRDTAMNT)-SUM(DEBITAMT) ELSE 0 END,0)
+		FROM gl10110
+		WHERE PERIODID<>0 and (YEAR1=@year1 and  PERIODID<=@periodid) and ACTINDX=@actindx),0)
+		 else 0 end
 	end
 	if @TipoTotal=2
 	begin
@@ -112,9 +121,20 @@ BEGIN
 		FROM gl10111 c
 		left join GL00100 p on p.ACTINDX = c.ACTINDX
 		left join SPEDtbl004 j on j.SPED_COD_CTA=p.USERDEF1
+		WHERE PERIODID<>0 and (YEAR1=@year1 and  PERIODID<=@periodid) and j.SPED_COD_NAT=4),0)+
+		isnull((SELECT isnull(abs(sum(DEBITAMT)),0)
+		FROM gl10110 c
+		left join GL00100 p on p.ACTINDX = c.ACTINDX
+		left join SPEDtbl004 j on j.SPED_COD_CTA=p.USERDEF1
 		WHERE PERIODID<>0 and (YEAR1=@year1 and  PERIODID<=@periodid) and j.SPED_COD_NAT=4),0)
+
 		set @ResCredito=isnull((SELECT isnull(abs(sum(CRDTAMNT)),0)
 		FROM gl10111 c
+		left join GL00100 p on p.ACTINDX = c.ACTINDX
+		left join SPEDtbl004 j on j.SPED_COD_CTA=p.USERDEF1
+		WHERE PERIODID<>0 and (YEAR1=@year1 and  PERIODID<=@periodid) and j.SPED_COD_NAT=4),0)+
+		isnull((SELECT isnull(abs(sum(CRDTAMNT)),0)
+		FROM gl10110 c
 		left join GL00100 p on p.ACTINDX = c.ACTINDX
 		left join SPEDtbl004 j on j.SPED_COD_CTA=p.USERDEF1
 		WHERE PERIODID<>0 and (YEAR1=@year1 and  PERIODID<=@periodid) and j.SPED_COD_NAT=4),0)

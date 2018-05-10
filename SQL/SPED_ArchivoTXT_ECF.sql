@@ -1,4 +1,6 @@
-/****** Object:  StoredProcedure [dbo].[SPED_ArchivoTXT_ECF]    Script Date: 6/14/2017 7:44:16 AM ******/
+USE [GBRA]
+GO
+/****** Object:  StoredProcedure [dbo].[SPED_ArchivoTXT_ECF]    Script Date: 5/9/2018 5:52:37 AM ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -8,7 +10,7 @@ GO
 -- Create date: <Create Date,,>
 -- Description:	<Description,,>
 -- =============================================
-create PROCEDURE [dbo].[SPED_ArchivoTXT_ECF] 
+ALTER PROCEDURE [dbo].[SPED_ArchivoTXT_ECF] 
 	@IdCompañia varchar (8),
 	@FechaDesde varchar(10),
 	@FechaHasta varchar(10)
@@ -22,7 +24,7 @@ delete spedtbl9000
 INSERT INTO spedtbl9000 (LINEA,seccion, datos) 
 	select @contador,'0000',isnull('|0000|'+	---REG,
 		'LECF|'+	--- NOME_ESC,
-		'0002|'+ --- COD_VER
+		'0003|'+ --- COD_VER
 		rtrim(isnull(com.TAXREGTN,''))+'|'+	---CNPJ
 		rtrim(isnull(com.CMPNYNAM,''))+'|'+	---NOME
 		'0|'+ ---ND_SIT_INI_PE
@@ -37,9 +39,9 @@ INSERT INTO spedtbl9000 (LINEA,seccion, datos)
 insert into spedtbl9000 (linea, seccion, datos)	
 		SELECT @contador+1,'0001',isnull('|0001|0|','')	--- SECCION 0001
 insert into spedtbl9000 (linea,seccion, datos)	
-	values(@contador+2,'0010',isnull('|0010||N|N|1|A|01|RRRR|BBBBBBBBBBBB|||||N|N|',''))---SECCION 0010
+	values(@contador+2,'0010',isnull('|0010||N|N|1|A|01|RRRR|BBBBBBBBBBBB||||||',''))----- version anterior'|0010||N|N|1|A|01|RRRR|BBBBBBBBBBBB|||||N|N|',''))---SECCION 0010
 insert into spedtbl9000 (linea,seccion, datos)	
-	values(@contador+3,'0020',isnull('|0020|1||N|N|N|N|N|N|S|N|N|N|N|N|N|N|N|N|N|N|N|N|N|N|N|N|N|N|N|N|',''))---SECCION 0020
+	values(@contador+3,'0020',isnull('|0020|1||N|N|N|N|N|N|S|N|N|N|N|N|N|N|N|N|N|N|N|N|N|N|N|N|N|N|N|N|N|',''))--- version anterior '|0020|1||N|N|N|N|N|N|S|N|N|N|N|N|N|N|N|N|N|N|N|N|N|N|N|N|N|N|N|N|',''))---SECCION 0020
 insert into SPEDtbl9000 (linea,seccion,datos)
 	SELECT @contador+4,'0030',ISNULL('|0030|2062|6391700|'+
 	substring(RTRIM(COM.ADDRESS1),1,LEN(rtrim(com.address1))-6)+
