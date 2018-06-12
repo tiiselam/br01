@@ -1,4 +1,6 @@
-/****** Object:  StoredProcedure [dbo].[SPED_ArchivoTXT_Hist]    Script Date: 5/14/2018 5:55:49 AM ******/
+USE [GBRA]
+GO
+/****** Object:  StoredProcedure [dbo].[SPED_ArchivoTXT_Hist]    Script Date: 6/12/2018 1:37:39 PM ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -8,7 +10,7 @@ GO
 -- Create date: <Create Date,,>
 -- Description:	<Description,,>
 -- =============================================
-CREATE PROCEDURE [dbo].[SPED_ArchivoTXT_Hist] 
+ALTER PROCEDURE [dbo].[SPED_ArchivoTXT_Hist] 
 	@IdCompañia varchar (8),
 	@FechaDesde varchar(10),
 	@FechaHasta varchar(10)
@@ -89,18 +91,20 @@ declare @codigogp as varchar(50)
 declare PlanCuentas_Cursor cursor for
 (SELECT DOCDATE,
 		SPED_COD_NAT,
-		isnull(left(pc.userdef1,10),SPED_COD_CTA),
+		SPED_COD_CTA,--- isnull(left(pc.userdef1,10),SPED_COD_CTA),
 		SPED_IND_CTA,
 		SPED_NIVEL,
 		SPED_COD_CTA_SUP,
 		SPED_CTA,
 		gc.ACTDESCR, ---isnull(pc.ACTDESCR,gc.ACTDESCR) AS ACTDESCR,
-		replace(replace(isnull(PC.USERDEF1,''),'-','.'),' ','') as userdef1,
+		'',---replace(replace(isnull(PC.USERDEF1,''),'-','.'),' ','') as userdef1,
 		'',---isnull(PC.USERDEF2,''),
-		isnull(pc.ACTNUMBR_1,'')
+		'' ---isnull(pc.ACTNUMBR_1,'')
+		---,case when sped_ind_cta='A' then userdef1 else '1' end
 	from SPEDtbl004 gc 
-	left join GL00100 pc on pc.USERDEF1=gc.SPED_COD_CTA
-	where SPED_NIVEL <=4) ---(case when sped_ind_cta='A' then userdef1 else '1' end) is not null)
+	----left join GL00100 pc on pc.USERDEF1=gc.SPED_COD_CTA
+	/*where SPED_NIVEL <=4*/
+	) ---(case when sped_ind_cta='A' then userdef1 else '1' end) is not null)
 	order by SPED_COD_CTA
 open PlanCuentas_Cursor
 FETCH NEXT FROM PlanCuentas_Cursor into 
@@ -119,6 +123,8 @@ FETCH NEXT FROM PlanCuentas_Cursor into
 WHILE @@FETCH_STATUS = 0  
 begin
 	set @contador=@contador+1
+	if /*@SPED_NIVEL=4 ---*/@SPED_IND_CTA='S'
+	begin
 	insert into spedtbl9000 (linea,seccion,datos)	
 		values (@contador+1,'I050',
 				isnull('|I050|'+	--- AS REG,'',
@@ -129,10 +135,11 @@ begin
 				RTRIM(@sped_cod_cta)+'|'+	---  AS CÓD_CTA,
 				RTRIM(@SPED_COD_CTA_SUP)+'|'+	--- AS CÓD_CTA_SUP,
 				RTRIM(@ACTDESCR)+'|',''))
-	if @SPED_NIVEL=4 ---@SPED_IND_CTA='A'
+	end
+	if @SPED_IND_CTA='A'
 	begin
 		declare Cuentas_gp cursor for (select ACTNUMBR_1,USERDEF1,max(cgp.ACTDESCR) as ACTDESCR  from gl00100 cgp 
-		where left(userdef1,10)=@sped_cod_cta 
+		where LTRIM(RTRIM(USERDEF1))=@sped_cod_cta 
 		group by ACTNUMBR_1,userdef1) ---,ACTDESCR)
 		order by ACTNUMBR_1
 		open Cuentas_gp
@@ -146,9 +153,9 @@ begin
 						rtrim(replace(convert(char,convert(datetime,@docdate,103),103),'/',''))+'|'+	--- AS DT_ALT,
 						RTRIM(LTRIM(@SPED_COD_NAT))+'|'+	--- AS COD_NAT,
 						'A|'+	--- AS IND_CTA,
-						'5|'+	--- AS NÍVEL,
-						RTRIM(@sped_cod_cta)+'.'+rtrim(@codigogp)+'|'+	---  AS CÓD_CTA,
-						RTRIM(@SPED_COD_CTA)+'|'+	--- AS CÓD_CTA_SUP,
+						LTRIM(STR(@SPED_NIVEL))+'|'+	--- AS NÍVEL,
+						RTRIM(LEFT(@sped_cod_cta,10))+'.'+rtrim(@codigogp)+'|'+	---  AS CÓD_CTA,
+						RTRIM(@SPED_COD_CTA_SUP)+'|'+	--- AS CÓD_CTA_SUP,
 						RTRIM(@ACTDESCR)+'|',''))
 			set @contador=@contador+1
 			insert into spedtbl9000 (linea,seccion, datos)	
@@ -435,6 +442,8 @@ DECLARE @RSped_cod_cta_n2 varchar(50)
 DECLARE @RSped_cod_cta_n3 varchar(50)
 DECLARE @RSped_cod_cta_n4 varchar(50)
 DECLARE @RSped_cod_cta_n5 varchar(50)
+DECLARE @CtaUtilGP varchar(50)
+Set @CtaUtilGP=(select USERDEF1 from GL40000 a inner join GL00100 b on a.RERINDX=b.ACTINDX)
 set @rMontoC=isnull((select SUM(abs(r.CRDTAMNT)) from GL10111 R
 inner join GL00100 p on p.ACTINDX=r.ACTINDX
 inner join SPEDtbl004 j on j.SPED_COD_CTA=p.USERDEF1
@@ -444,7 +453,7 @@ inner join GL00100 p on p.ACTINDX=r.ACTINDX
 inner join SPEDtbl004 j on j.SPED_COD_CTA=p.USERDEF1
 where j.SPED_COD_NAT=4 and r.YEAR1=@vanio),0)*/
 /******/
-set @rMontoD=isnull((select SUM(abs(r.DEBITAMT)) from GL10111 R
+set @rMontoD=isnull((select SUM(abs(r.DEBITAMT)) from gl10111 R
 inner join GL00100 p on p.ACTINDX=r.ACTINDX
 inner join SPEDtbl004 j on j.SPED_COD_CTA=p.USERDEF1
 where j.SPED_COD_NAT=4 and r.YEAR1=@vanio),0)/*+
@@ -453,7 +462,7 @@ inner join GL00100 p on p.ACTINDX=r.ACTINDX
 inner join SPEDtbl004 j on j.SPED_COD_CTA=p.USERDEF1
 where j.SPED_COD_NAT=4 and r.YEAR1=@vanio),0)*/
 /******/
-set @rMonto=isnull((select SUM(r.PERDBLNC) from GL10111 R
+set @rMonto=isnull((select SUM(r.PERDBLNC) from gl10111 R
 inner join GL00100 p on p.ACTINDX=r.ACTINDX
 inner join SPEDtbl004 j on j.SPED_COD_CTA=p.USERDEF1
 where j.SPED_COD_NAT=4 and r.YEAR1=@vanio),0)
@@ -476,294 +485,26 @@ declare Balance_cursor cursor for
 g.SPED_NIVEL,
 g.SPED_COD_NAT,
 g.ACTDESCR,
-case SPED_NIVEL when 1 then abs(isnull((select sum(s.DEBITAMT-s.CRDTAMNT)						-----saldo inicial en año abierto
+isnull((select abs(isnull(sum(s.DEBITAMT-s.CRDTAMNT),0))						-----saldo inicial en año abierto
 	from GL10111 s
 	left join GL00100 pc on s.ACTINDX = pc.actindx
-	left join SPEDtbl004 n5 on n5.SPED_COD_CTA = pc.userdef1
-	left join spedtbl004 n4 on n4.SPED_COD_CTA = n5.SPED_COD_CTA_SUP
-	left join spedtbl004 n3 on n3.SPED_COD_CTA = n4.SPED_COD_CTA_SUP
-	left join spedtbl004 n2 on n2.SPED_COD_CTA = n3.SPED_COD_CTA_SUP
-	left join spedtbl004 n1 on n1.SPED_COD_CTA = n2.SPED_COD_CTA_SUP
-	where s.YEAR1=@vanio and n1.SPED_COD_CTA=g.SPED_COD_CTA and PERIODID =0),0))
-	when 2 then abs(isnull((select sum(s.DEBITAMT-s.CRDTAMNT)
+	where s.YEAR1 =@vanio and ltrim(rtrim(pc.USERDEF1)) like ltrim(rtrim(g.sped_cod_cta))+'%' and PERIODID =0),0)
+	as inicial,
+isnull((select case when sum(abs(s.CRDTAMNT))>sum(abs(s.DEBITAMT)) then 'C' else 'D' end
+	from gl10111 s
+	left join GL00100 pc on s.ACTINDX = pc.actindx
+	where s.YEAR1 =@vanio and ltrim(rtrim(pc.USERDEF1)) like ltrim(rtrim(g.sped_cod_cta))+'%' and PERIODID =0),0)
+	as tipoInicial,
+isnull((select abs(isnull((select sum(S.PERDBLNC)),0)+case when ltrim(rtrim(@CtaUtilGP)) like ltrim(rtrim(g.sped_cod_cta))+'%' then  @RMonto else 0 end)
 	from GL10111 s
 	left join GL00100 pc on s.ACTINDX = pc.actindx
-	left join SPEDtbl004 n5 on n5.SPED_COD_CTA = pc.userdef1
-	left join spedtbl004 n4 on n4.SPED_COD_CTA = n5.SPED_COD_CTA_SUP
-	left join spedtbl004 n3 on n3.SPED_COD_CTA = n4.SPED_COD_CTA_SUP
-	left join spedtbl004 n2 on n2.SPED_COD_CTA = n3.SPED_COD_CTA_SUP
-	left join spedtbl004 n1 on n1.SPED_COD_CTA = n2.SPED_COD_CTA_SUP
-	where s.YEAR1 =@vanio and n2.SPED_COD_CTA=g.SPED_COD_CTA and PERIODID =0),0))
-	when 3 then abs((select sum(s.DEBITAMT-s.CRDTAMNT)
+	where s.YEAR1 =@vanio and ltrim(rtrim(pc.USERDEF1)) like ltrim(rtrim(g.sped_cod_cta))+'%'),0)
+	 as saldo,
+isnull((select case when isnull(SUM(ABS(s.CRDTAMNT)),0)+case when ltrim(rtrim(@CtaUtilGP)) like ltrim(rtrim(g.sped_cod_cta))+'%' then  @RMontoc else 0 end>isnull(SUM(ABS(s.DEBITAMT)),0)+case when ltrim(rtrim(@CtaUtilGP)) like ltrim(rtrim(g.sped_cod_cta))+'%' then  @RMontoc else 0 end then 'C' else 'D' end
 	from GL10111 s
 	left join GL00100 pc on s.ACTINDX = pc.actindx
-	left join SPEDtbl004 n5 on n5.SPED_COD_CTA = pc.userdef1
-	left join spedtbl004 n4 on n4.SPED_COD_CTA = n5.SPED_COD_CTA_SUP
-	left join spedtbl004 n3 on n3.SPED_COD_CTA = n4.SPED_COD_CTA_SUP
-	left join spedtbl004 n2 on n2.SPED_COD_CTA = n3.SPED_COD_CTA_SUP
-	left join spedtbl004 n1 on n1.SPED_COD_CTA = n2.SPED_COD_CTA_SUP
-	where s.YEAR1 =@vanio and n3.SPED_COD_CTA=g.SPED_COD_CTA and PERIODID =0))
-	when 4 then abs((select sum(s.DEBITAMT-s.CRDTAMNT)
-	from GL10111 s
-	left join GL00100 pc on s.ACTINDX = pc.actindx
-	left join SPEDtbl004 n5 on n5.SPED_COD_CTA = pc.userdef1
-	left join spedtbl004 n4 on n4.SPED_COD_CTA = n5.SPED_COD_CTA_SUP
-	left join spedtbl004 n3 on n3.SPED_COD_CTA = n4.SPED_COD_CTA_SUP
-	left join spedtbl004 n2 on n2.SPED_COD_CTA = n3.SPED_COD_CTA_SUP
-	left join spedtbl004 n1 on n1.SPED_COD_CTA = n2.SPED_COD_CTA_SUP
-	where s.YEAR1 =@vanio and n4.SPED_COD_CTA=g.SPED_COD_CTA and PERIODID =0))
-	when 5 then abs((select sum(s.DEBITAMT-s.CRDTAMNT)
-	from GL10111 s
-	left join GL00100 pc on s.ACTINDX = pc.actindx
-	left join SPEDtbl004 n5 on n5.SPED_COD_CTA = pc.userdef1
-	left join spedtbl004 n4 on n4.SPED_COD_CTA = n5.SPED_COD_CTA_SUP
-	left join spedtbl004 n3 on n3.SPED_COD_CTA = n4.SPED_COD_CTA_SUP
-	left join spedtbl004 n2 on n2.SPED_COD_CTA = n3.SPED_COD_CTA_SUP
-	left join spedtbl004 n1 on n1.SPED_COD_CTA = n2.SPED_COD_CTA_SUP
-	where s.YEAR1 =@vanio and n4.SPED_COD_CTA=g.SPED_COD_CTA and PERIODID =0))
-	end as inicial,
-case SPED_NIVEL 
-	when 1 then	(select case when sum(abs(s.CRDTAMNT))>sum(abs(s.DEBITAMT)) then 'C' else 'D' end
-	from GL10111 s
-	left join GL00100 pc on s.ACTINDX = pc.actindx
-	left join SPEDtbl004 n5 on n5.SPED_COD_CTA = pc.userdef1
-	left join spedtbl004 n4 on n4.SPED_COD_CTA = n5.SPED_COD_CTA_SUP
-	left join spedtbl004 n3 on n3.SPED_COD_CTA = n4.SPED_COD_CTA_SUP
-	left join spedtbl004 n2 on n2.SPED_COD_CTA = n3.SPED_COD_CTA_SUP
-	left join spedtbl004 n1 on n1.SPED_COD_CTA = n2.SPED_COD_CTA_SUP
-	where s.YEAR1 =@vanio and n1.SPED_COD_CTA=g.SPED_COD_CTA and PERIODID =0)
-	when 2 then (select case when sum(abs(s.CRDTAMNT))>sum(abs(s.DEBITAMT)) then 'C' else 'D' end
-	from GL10111 s
-	left join GL00100 pc on s.ACTINDX = pc.actindx
-	left join SPEDtbl004 n5 on n5.SPED_COD_CTA = pc.userdef1
-	left join spedtbl004 n4 on n4.SPED_COD_CTA = n5.SPED_COD_CTA_SUP
-	left join spedtbl004 n3 on n3.SPED_COD_CTA = n4.SPED_COD_CTA_SUP
-	left join spedtbl004 n2 on n2.SPED_COD_CTA = n3.SPED_COD_CTA_SUP
-	left join spedtbl004 n1 on n1.SPED_COD_CTA = n2.SPED_COD_CTA_SUP
-	where s.YEAR1 =@vanio and n2.SPED_COD_CTA=g.SPED_COD_CTA and PERIODID =0)
-	when 3 then (select case when sum(abs(s.CRDTAMNT))>sum(abs(s.DEBITAMT)) then 'C' else 'D' end
-	from GL10111 s
-	left join GL00100 pc on s.ACTINDX = pc.actindx
-	left join SPEDtbl004 n5 on n5.SPED_COD_CTA = pc.userdef1
-	left join spedtbl004 n4 on n4.SPED_COD_CTA = n5.SPED_COD_CTA_SUP
-	left join spedtbl004 n3 on n3.SPED_COD_CTA = n4.SPED_COD_CTA_SUP
-	left join spedtbl004 n2 on n2.SPED_COD_CTA = n3.SPED_COD_CTA_SUP
-	left join spedtbl004 n1 on n1.SPED_COD_CTA = n2.SPED_COD_CTA_SUP
-	where s.YEAR1 =@vanio and n3.SPED_COD_CTA=g.SPED_COD_CTA and PERIODID =0)
-	when 4 then (select case when sum(abs(s.CRDTAMNT))>sum(abs(s.DEBITAMT)) then 'C' else 'D' end
-	from GL10111 s
-	left join GL00100 pc on s.ACTINDX = pc.actindx
-	left join SPEDtbl004 n5 on n5.SPED_COD_CTA = pc.userdef1
-	left join spedtbl004 n4 on n4.SPED_COD_CTA = n5.SPED_COD_CTA_SUP
-	left join spedtbl004 n3 on n3.SPED_COD_CTA = n4.SPED_COD_CTA_SUP
-	left join spedtbl004 n2 on n2.SPED_COD_CTA = n3.SPED_COD_CTA_SUP
-	left join spedtbl004 n1 on n1.SPED_COD_CTA = n2.SPED_COD_CTA_SUP
-	where s.YEAR1 =@vanio and n4.SPED_COD_CTA=g.SPED_COD_CTA and PERIODID =0)
-	when 5 then (select case when sum(abs(s.CRDTAMNT))>sum(abs(s.DEBITAMT)) then 'C' else 'D' end
-	from GL10111 s
-	left join GL00100 pc on s.ACTINDX = pc.actindx
-	left join SPEDtbl004 n5 on n5.SPED_COD_CTA = pc.userdef1
-	left join spedtbl004 n4 on n4.SPED_COD_CTA = n5.SPED_COD_CTA_SUP
-	left join spedtbl004 n3 on n3.SPED_COD_CTA = n4.SPED_COD_CTA_SUP
-	left join spedtbl004 n2 on n2.SPED_COD_CTA = n3.SPED_COD_CTA_SUP
-	left join spedtbl004 n1 on n1.SPED_COD_CTA = n2.SPED_COD_CTA_SUP
-	where s.YEAR1 =@vanio and n5.SPED_COD_CTA=g.SPED_COD_CTA and PERIODID =0)
-	end as tipoInicial,
-case SPED_NIVEL when 1 then
-	abs(case when @RSped_Cod_Cta_N1 = g.SPED_COD_CTA then (select SUM(S.PERDBLNC)
-	from GL10111 s
-	left join GL00100 pc on s.ACTINDX = pc.actindx
-	left join SPEDtbl004 n5 on n5.SPED_COD_CTA = pc.userdef1
-	left join spedtbl004 n4 on n4.SPED_COD_CTA = n5.SPED_COD_CTA_SUP
-	left join spedtbl004 n3 on n3.SPED_COD_CTA = n4.SPED_COD_CTA_SUP
-	left join spedtbl004 n2 on n2.SPED_COD_CTA = n3.SPED_COD_CTA_SUP
-	left join spedtbl004 n1 on n1.SPED_COD_CTA = n2.SPED_COD_CTA_SUP
-	where s.YEAR1 =@vanio and n1.SPED_COD_CTA=g.SPED_COD_CTA)+@RMonto
-	else (select SUM(S.PERDBLNC)
-	from GL10111 s
-	left join GL00100 pc on s.ACTINDX = pc.actindx
-	left join SPEDtbl004 n5 on n5.SPED_COD_CTA = pc.userdef1
-	left join spedtbl004 n4 on n4.SPED_COD_CTA = n5.SPED_COD_CTA_SUP
-	left join spedtbl004 n3 on n3.SPED_COD_CTA = n4.SPED_COD_CTA_SUP
-	left join spedtbl004 n2 on n2.SPED_COD_CTA = n3.SPED_COD_CTA_SUP
-	left join spedtbl004 n1 on n1.SPED_COD_CTA = n2.SPED_COD_CTA_SUP
-	where s.YEAR1 =@vanio and n1.SPED_COD_CTA=g.SPED_COD_CTA)
-	end)
-	when 2 then 
-	abs(case when @RSped_cod_cta_n2 =g.SPED_COD_CTA then isnull((select SUM(S.PERDBLNC)
-	from GL10111 s
-	left join GL00100 pc on s.ACTINDX = pc.actindx
-	left join SPEDtbl004 n5 on n5.SPED_COD_CTA = pc.userdef1
-	left join spedtbl004 n4 on n4.SPED_COD_CTA = n5.SPED_COD_CTA_SUP
-	left join spedtbl004 n3 on n3.SPED_COD_CTA = n4.SPED_COD_CTA_SUP
-	left join spedtbl004 n2 on n2.SPED_COD_CTA = n3.SPED_COD_CTA_SUP
-	left join spedtbl004 n1 on n1.SPED_COD_CTA = n2.SPED_COD_CTA_SUP
-	where s.YEAR1 =@vanio and n2.SPED_COD_CTA=g.SPED_COD_CTA),0)+@RMonto
-	else (select SUM(S.PERDBLNC)
-	from GL10111 s
-	left join GL00100 pc on s.ACTINDX = pc.actindx
-	left join SPEDtbl004 n5 on n5.SPED_COD_CTA = pc.userdef1
-	left join spedtbl004 n4 on n4.SPED_COD_CTA = n5.SPED_COD_CTA_SUP
-	left join spedtbl004 n3 on n3.SPED_COD_CTA = n4.SPED_COD_CTA_SUP
-	left join spedtbl004 n2 on n2.SPED_COD_CTA = n3.SPED_COD_CTA_SUP
-	left join spedtbl004 n1 on n1.SPED_COD_CTA = n2.SPED_COD_CTA_SUP
-	where s.YEAR1 =@vanio and n2.SPED_COD_CTA=g.SPED_COD_CTA)
-	end)
-	when 3 then abs(case when @RSped_cod_cta_n3=g.SPED_COD_CTA then isnull((select SUM(S.PERDBLNC)
-	from GL10111 s
-	left join GL00100 pc on s.ACTINDX = pc.actindx
-	left join SPEDtbl004 n5 on n5.SPED_COD_CTA = pc.userdef1
-	left join spedtbl004 n4 on n4.SPED_COD_CTA = n5.SPED_COD_CTA_SUP
-	left join spedtbl004 n3 on n3.SPED_COD_CTA = n4.SPED_COD_CTA_SUP
-	left join spedtbl004 n2 on n2.SPED_COD_CTA = n3.SPED_COD_CTA_SUP
-	left join spedtbl004 n1 on n1.SPED_COD_CTA = n2.SPED_COD_CTA_SUP
-	where s.YEAR1 =@vanio and n3.SPED_COD_CTA=g.SPED_COD_CTA),0)+@RMonto
-	else (select SUM(S.PERDBLNC)
-	from GL10111 s
-	left join GL00100 pc on s.ACTINDX = pc.actindx
-	left join SPEDtbl004 n5 on n5.SPED_COD_CTA = pc.userdef1
-	left join spedtbl004 n4 on n4.SPED_COD_CTA = n5.SPED_COD_CTA_SUP
-	left join spedtbl004 n3 on n3.SPED_COD_CTA = n4.SPED_COD_CTA_SUP
-	left join spedtbl004 n2 on n2.SPED_COD_CTA = n3.SPED_COD_CTA_SUP
-	left join spedtbl004 n1 on n1.SPED_COD_CTA = n2.SPED_COD_CTA_SUP
-	where s.YEAR1 =@vanio and n3.SPED_COD_CTA=g.SPED_COD_CTA) end)
-	when 4 then abs(case when @RSped_cod_cta_n4=g.SPED_COD_CTA then isnull((select sum(S.PERDBLNC)
-	from GL10111 s
-	left join GL00100 pc on s.ACTINDX = pc.actindx
-	left join SPEDtbl004 n5 on n5.SPED_COD_CTA = pc.userdef1
-	left join spedtbl004 n4 on n4.SPED_COD_CTA = n5.SPED_COD_CTA_SUP
-	left join spedtbl004 n3 on n3.SPED_COD_CTA = n4.SPED_COD_CTA_SUP
-	left join spedtbl004 n2 on n2.SPED_COD_CTA = n3.SPED_COD_CTA_SUP
-	left join spedtbl004 n1 on n1.SPED_COD_CTA = n2.SPED_COD_CTA_SUP
-	where s.YEAR1 =@vanio and n4.SPED_COD_CTA=g.SPED_COD_CTA),0)+@RMonto
-	else (select sum(S.PERDBLNC)
-	from GL10111 s
-	left join GL00100 pc on s.ACTINDX = pc.actindx
-	left join SPEDtbl004 n5 on n5.SPED_COD_CTA = pc.userdef1
-	left join spedtbl004 n4 on n4.SPED_COD_CTA = n5.SPED_COD_CTA_SUP
-	left join spedtbl004 n3 on n3.SPED_COD_CTA = n4.SPED_COD_CTA_SUP
-	left join spedtbl004 n2 on n2.SPED_COD_CTA = n3.SPED_COD_CTA_SUP
-	left join spedtbl004 n1 on n1.SPED_COD_CTA = n2.SPED_COD_CTA_SUP
-	where s.YEAR1 =@vanio and n4.SPED_COD_CTA=g.SPED_COD_CTA)
-	end)
-	when 5 then abs(case when @RSped_cod_cta_n4=g.SPED_COD_CTA then isnull((select sum(S.PERDBLNC)
-	from GL10111 s
-	left join GL00100 pc on s.ACTINDX = pc.actindx
-	left join SPEDtbl004 n5 on n5.SPED_COD_CTA = pc.userdef1
-	left join spedtbl004 n4 on n4.SPED_COD_CTA = n5.SPED_COD_CTA_SUP
-	left join spedtbl004 n3 on n3.SPED_COD_CTA = n4.SPED_COD_CTA_SUP
-	left join spedtbl004 n2 on n2.SPED_COD_CTA = n3.SPED_COD_CTA_SUP
-	left join spedtbl004 n1 on n1.SPED_COD_CTA = n2.SPED_COD_CTA_SUP
-	where s.YEAR1 =@vanio and n5.SPED_COD_CTA=g.SPED_COD_CTA),0)+@RMonto
-	else (select sum(S.PERDBLNC)
-	from GL10111 s
-	left join GL00100 pc on s.ACTINDX = pc.actindx
-	left join SPEDtbl004 n5 on n5.SPED_COD_CTA = pc.userdef1
-	left join spedtbl004 n4 on n4.SPED_COD_CTA = n5.SPED_COD_CTA_SUP
-	left join spedtbl004 n3 on n3.SPED_COD_CTA = n4.SPED_COD_CTA_SUP
-	left join spedtbl004 n2 on n2.SPED_COD_CTA = n3.SPED_COD_CTA_SUP
-	left join spedtbl004 n1 on n1.SPED_COD_CTA = n2.SPED_COD_CTA_SUP
-	where s.YEAR1 =@vanio and n5.SPED_COD_CTA=g.SPED_COD_CTA)
-	end)
-	end as saldo,
-case SPED_NIVEL 
-	when 1 then	(case when @RSped_Cod_Cta_N1 = g.SPED_COD_CTA then 
-	(select case when isnull(SUM(ABS(s.CRDTAMNT)),0)+@RMontoc>isnull(SUM(ABS(s.DEBITAMT)),0)+@RMontod then 'C' else 'D' end
-	from GL10111 s
-	left join GL00100 pc on s.ACTINDX = pc.actindx
-	left join SPEDtbl004 n5 on n5.SPED_COD_CTA = pc.userdef1
-	left join spedtbl004 n4 on n4.SPED_COD_CTA = n5.SPED_COD_CTA_SUP
-	left join spedtbl004 n3 on n3.SPED_COD_CTA = n4.SPED_COD_CTA_SUP
-	left join spedtbl004 n2 on n2.SPED_COD_CTA = n3.SPED_COD_CTA_SUP
-	left join spedtbl004 n1 on n1.SPED_COD_CTA = n2.SPED_COD_CTA_SUP
-	where s.YEAR1 =@vanio and n1.SPED_COD_CTA=g.SPED_COD_CTA)
-	else (select case when SUM(ABS(s.CRDTAMNT))>SUM(ABS(s.DEBITAMT)) then 'C' else 'D' end
-	from GL10111 s
-	left join GL00100 pc on s.ACTINDX = pc.actindx
-	left join SPEDtbl004 n5 on n5.SPED_COD_CTA = pc.userdef1
-	left join spedtbl004 n4 on n4.SPED_COD_CTA = n5.SPED_COD_CTA_SUP
-	left join spedtbl004 n3 on n3.SPED_COD_CTA = n4.SPED_COD_CTA_SUP
-	left join spedtbl004 n2 on n2.SPED_COD_CTA = n3.SPED_COD_CTA_SUP
-	left join spedtbl004 n1 on n1.SPED_COD_CTA = n2.SPED_COD_CTA_SUP
-	where s.YEAR1 =@vanio and n1.SPED_COD_CTA=g.SPED_COD_CTA)
-	 end)
-	when 2 then (case when @RSped_Cod_Cta_N2 = g.SPED_COD_CTA then (select case when isnull(SUM(ABS(s.CRDTAMNT)),0)+@RMontoc>isnull(SUM(ABS(s.DEBITAMT)),0)+@rMontod then 'C' else 'D' end
-	from GL10111 s
-	left join GL00100 pc on s.ACTINDX = pc.actindx
-	left join SPEDtbl004 n5 on n5.SPED_COD_CTA = pc.userdef1
-	left join spedtbl004 n4 on n4.SPED_COD_CTA = n5.SPED_COD_CTA_SUP
-	left join spedtbl004 n3 on n3.SPED_COD_CTA = n4.SPED_COD_CTA_SUP
-	left join spedtbl004 n2 on n2.SPED_COD_CTA = n3.SPED_COD_CTA_SUP
-	left join spedtbl004 n1 on n1.SPED_COD_CTA = n2.SPED_COD_CTA_SUP
-	where s.YEAR1 =@vanio and n2.SPED_COD_CTA=g.SPED_COD_CTA)
-	else (select case when SUM(ABS(s.CRDTAMNT))>SUM(ABS(s.DEBITAMT)) then 'C' else 'D' end
-	from GL10111 s
-	left join GL00100 pc on s.ACTINDX = pc.actindx
-	left join SPEDtbl004 n5 on n5.SPED_COD_CTA = pc.userdef1
-	left join spedtbl004 n4 on n4.SPED_COD_CTA = n5.SPED_COD_CTA_SUP
-	left join spedtbl004 n3 on n3.SPED_COD_CTA = n4.SPED_COD_CTA_SUP
-	left join spedtbl004 n2 on n2.SPED_COD_CTA = n3.SPED_COD_CTA_SUP
-	left join spedtbl004 n1 on n1.SPED_COD_CTA = n2.SPED_COD_CTA_SUP
-	where s.YEAR1 =@vanio and n2.SPED_COD_CTA=g.SPED_COD_CTA)
-	 end)
-	when 3 then (case when @RSped_Cod_Cta_N3 = g.SPED_COD_CTA then 
-	(select case when isnull(SUM(ABS(s.CRDTAMNT)),0)+@RMontoc>isnull(SUM(ABS(s.DEBITAMT)),0)+@RMontod then 'C' else 'D' end
-	from GL10111 s
-	left join GL00100 pc on s.ACTINDX = pc.actindx
-	left join SPEDtbl004 n5 on n5.SPED_COD_CTA = pc.userdef1
-	left join spedtbl004 n4 on n4.SPED_COD_CTA = n5.SPED_COD_CTA_SUP
-	left join spedtbl004 n3 on n3.SPED_COD_CTA = n4.SPED_COD_CTA_SUP
-	left join spedtbl004 n2 on n2.SPED_COD_CTA = n3.SPED_COD_CTA_SUP
-	left join spedtbl004 n1 on n1.SPED_COD_CTA = n2.SPED_COD_CTA_SUP
-	where s.YEAR1 =@vanio and n3.SPED_COD_CTA=g.SPED_COD_CTA)
-	else (select case when SUM(ABS(s.CRDTAMNT))>SUM(ABS(s.DEBITAMT)) then 'C' else 'D' end
-	from GL10111 s
-	left join GL00100 pc on s.ACTINDX = pc.actindx
-	left join SPEDtbl004 n5 on n5.SPED_COD_CTA = pc.userdef1
-	left join spedtbl004 n4 on n4.SPED_COD_CTA = n5.SPED_COD_CTA_SUP
-	left join spedtbl004 n3 on n3.SPED_COD_CTA = n4.SPED_COD_CTA_SUP
-	left join spedtbl004 n2 on n2.SPED_COD_CTA = n3.SPED_COD_CTA_SUP
-	left join spedtbl004 n1 on n1.SPED_COD_CTA = n2.SPED_COD_CTA_SUP
-	where s.YEAR1 =@vanio and n3.SPED_COD_CTA=g.SPED_COD_CTA) end)
-	when 4 then (case when @RSped_Cod_Cta_N4 = g.SPED_COD_CTA then (select case when isnull(SUM(ABS(s.CRDTAMNT)),0)+@RMontoc>isnull(SUM(ABS(s.DEBITAMT)),0)+@RMontod then 'C' else 'D' end
-	from GL10111 s
-	left join GL00100 pc on s.ACTINDX = pc.actindx
-	left join SPEDtbl004 n5 on n5.SPED_COD_CTA = pc.userdef1
-	left join spedtbl004 n4 on n4.SPED_COD_CTA = n5.SPED_COD_CTA_SUP
-	left join spedtbl004 n3 on n3.SPED_COD_CTA = n4.SPED_COD_CTA_SUP
-	left join spedtbl004 n2 on n2.SPED_COD_CTA = n3.SPED_COD_CTA_SUP
-	left join spedtbl004 n1 on n1.SPED_COD_CTA = n2.SPED_COD_CTA_SUP
-	where s.YEAR1 =@vanio and n4.SPED_COD_CTA=g.SPED_COD_CTA)
-	else (select case when SUM(ABS(s.CRDTAMNT))>SUM(ABS(s.DEBITAMT)) then 'C' else 'D' end
-	from GL10111 s
-	left join GL00100 pc on s.ACTINDX = pc.actindx
-	left join SPEDtbl004 n5 on n5.SPED_COD_CTA = pc.userdef1
-	left join spedtbl004 n4 on n4.SPED_COD_CTA = n5.SPED_COD_CTA_SUP
-	left join spedtbl004 n3 on n3.SPED_COD_CTA = n4.SPED_COD_CTA_SUP
-	left join spedtbl004 n2 on n2.SPED_COD_CTA = n3.SPED_COD_CTA_SUP
-	left join spedtbl004 n1 on n1.SPED_COD_CTA = n2.SPED_COD_CTA_SUP
-	where s.YEAR1 =@vanio and n4.SPED_COD_CTA=g.SPED_COD_CTA)
-	 end)
-	when 5 then (case when @RSped_Cod_Cta_N5 = g.SPED_COD_CTA then (select case when isnull(SUM(ABS(s.CRDTAMNT)),0)+@RMontoc>isnull(SUM(ABS(s.DEBITAMT)),0)+@RMontod then 'C' else 'D' end
-	from GL10111 s
-	left join GL00100 pc on s.ACTINDX = pc.actindx
-	left join SPEDtbl004 n5 on n5.SPED_COD_CTA = pc.userdef1
-	left join spedtbl004 n4 on n4.SPED_COD_CTA = n5.SPED_COD_CTA_SUP
-	left join spedtbl004 n3 on n3.SPED_COD_CTA = n4.SPED_COD_CTA_SUP
-	left join spedtbl004 n2 on n2.SPED_COD_CTA = n3.SPED_COD_CTA_SUP
-	left join spedtbl004 n1 on n1.SPED_COD_CTA = n2.SPED_COD_CTA_SUP
-	where s.YEAR1 =@vanio and n5.SPED_COD_CTA=g.SPED_COD_CTA)
-	else (select case when SUM(ABS(s.CRDTAMNT))>SUM(ABS(s.DEBITAMT)) then 'C' else 'D' end
-	from GL10111 s
-	left join GL00100 pc on s.ACTINDX = pc.actindx
-	left join SPEDtbl004 n5 on n5.SPED_COD_CTA = pc.userdef1
-	left join spedtbl004 n4 on n4.SPED_COD_CTA = n5.SPED_COD_CTA_SUP
-	left join spedtbl004 n3 on n3.SPED_COD_CTA = n4.SPED_COD_CTA_SUP
-	left join spedtbl004 n2 on n2.SPED_COD_CTA = n3.SPED_COD_CTA_SUP
-	left join spedtbl004 n1 on n1.SPED_COD_CTA = n2.SPED_COD_CTA_SUP
-	where s.YEAR1 =@vanio and n5.SPED_COD_CTA=g.SPED_COD_CTA)
-	 end)
-	end as tipo
+	where s.YEAR1 =@vanio and ltrim(rtrim(pc.USERDEF1)) like ltrim(rtrim(g.sped_cod_cta))+'%'),0)
+	as tipo
 from SPEDtbl004 g
 where G.SPED_COD_NAT IN (1,2,3)) order by g.SPED_COD_CTA
 open Balance_cursor
@@ -796,110 +537,16 @@ declare Resultado_Cursor cursor for
 g.SPED_NIVEL,
 g.SPED_COD_NAT,
 g.ACTDESCR,
-case SPED_NIVEL 
-	when 1 then abs((select abs(SUM(s.DEBITAMT)-SUM(s.CRDTAMNT))
+isnull((select abs(SUM(s.DEBITAMT)-SUM(s.CRDTAMNT))
 	from GL10111 s
 	left join GL00100 pc on s.ACTINDX = pc.actindx
-	left join SPEDtbl004 n6 on n6.SPED_COD_CTA = pc.userdef1
-	left join spedtbl004 n5 on n5.SPED_COD_CTA = n6.SPED_COD_CTA_SUP
-	left join spedtbl004 n4 on n4.SPED_COD_CTA = n5.SPED_COD_CTA_SUP
-	left join spedtbl004 n3 on n3.SPED_COD_CTA = n4.SPED_COD_CTA_SUP
-	left join spedtbl004 n2 on n2.SPED_COD_CTA = n3.SPED_COD_CTA_SUP
-	left join spedtbl004 n1 on n1.SPED_COD_CTA = n2.SPED_COD_CTA_SUP
-	where s.YEAR1=@vanio and n1.SPED_COD_CTA=g.SPED_COD_CTA))
-	when 2 then abs((select abs(SUM(s.DEBITAMT)-SUM(s.CRDTAMNT))
+	where s.YEAR1 =@vanio and ltrim(rtrim(pc.USERDEF1)) like ltrim(rtrim(g.sped_cod_cta))+'%'),0)
+	 as saldo,
+isnull((select case when ABS(isnull(SUM(s.CRDTAMNT),0))>ABS(isnull(SUM(s.DEBITAMT),0)) then 'C' else 'D' end
 	from GL10111 s
 	left join GL00100 pc on s.ACTINDX = pc.actindx
-	left join SPEDtbl004 n6 on n6.SPED_COD_CTA = pc.userdef1
-	left join spedtbl004 n5 on n5.SPED_COD_CTA = n6.SPED_COD_CTA_SUP
-	left join spedtbl004 n4 on n4.SPED_COD_CTA = n5.SPED_COD_CTA_SUP
-	left join spedtbl004 n3 on n3.SPED_COD_CTA = n4.SPED_COD_CTA_SUP
-	left join spedtbl004 n2 on n2.SPED_COD_CTA = n3.SPED_COD_CTA_SUP
-	left join spedtbl004 n1 on n1.SPED_COD_CTA = n2.SPED_COD_CTA_SUP
-	where s.YEAR1 =@vanio and n2.SPED_COD_CTA=g.SPED_COD_CTA))
-	when 3 then abs((select abs(SUM(s.DEBITAMT)-SUM(s.CRDTAMNT))
-	from GL10111 s
-	left join GL00100 pc on s.ACTINDX = pc.actindx
-	left join SPEDtbl004 n6 on n6.SPED_COD_CTA = pc.userdef1
-	left join spedtbl004 n5 on n5.SPED_COD_CTA = n6.SPED_COD_CTA_SUP
-	left join spedtbl004 n4 on n4.SPED_COD_CTA = n5.SPED_COD_CTA_SUP
-	left join spedtbl004 n3 on n3.SPED_COD_CTA = n4.SPED_COD_CTA_SUP
-	left join spedtbl004 n2 on n2.SPED_COD_CTA = n3.SPED_COD_CTA_SUP
-	left join spedtbl004 n1 on n1.SPED_COD_CTA = n2.SPED_COD_CTA_SUP
-	where s.YEAR1 =@vanio and n3.SPED_COD_CTA=g.SPED_COD_CTA))
-	when 4 then abs((select abs(SUM(s.DEBITAMT)-SUM(s.CRDTAMNT))
-	from GL10111 s
-	left join GL00100 pc on s.ACTINDX = pc.actindx
-	left join SPEDtbl004 n6 on n6.SPED_COD_CTA = pc.userdef1
-	left join spedtbl004 n5 on n5.SPED_COD_CTA = n6.SPED_COD_CTA_SUP
-	left join spedtbl004 n4 on n4.SPED_COD_CTA = n5.SPED_COD_CTA_SUP
-	left join spedtbl004 n3 on n3.SPED_COD_CTA = n4.SPED_COD_CTA_SUP
-	left join spedtbl004 n2 on n2.SPED_COD_CTA = n3.SPED_COD_CTA_SUP
-	left join spedtbl004 n1 on n1.SPED_COD_CTA = n2.SPED_COD_CTA_SUP
-	where s.YEAR1 =@vanio and n4.SPED_COD_CTA=g.SPED_COD_CTA))
-	when 5 then abs((select abs(SUM(s.DEBITAMT)-SUM(s.CRDTAMNT))
-	from GL10111 s
-	left join GL00100 pc on s.ACTINDX = pc.actindx
-	left join SPEDtbl004 n6 on n6.SPED_COD_CTA = pc.userdef1
-	left join spedtbl004 n5 on n5.SPED_COD_CTA = n6.SPED_COD_CTA_SUP
-	left join spedtbl004 n4 on n4.SPED_COD_CTA = n5.SPED_COD_CTA_SUP
-	left join spedtbl004 n3 on n3.SPED_COD_CTA = n4.SPED_COD_CTA_SUP
-	left join spedtbl004 n2 on n2.SPED_COD_CTA = n3.SPED_COD_CTA_SUP
-	left join spedtbl004 n1 on n1.SPED_COD_CTA = n2.SPED_COD_CTA_SUP
-	where s.YEAR1 =@vanio and n5.SPED_COD_CTA=g.SPED_COD_CTA))
-	end as saldo,
-case SPED_NIVEL 
-	when 1 then	(select case when abs(SUM(s.CRDTAMNT))>abs(SUM(s.DEBITAMT)) then 'C' else 'D' end
-	from GL10111 s
-	left join GL00100 pc on s.ACTINDX = pc.actindx
-	left join SPEDtbl004 n6 on n6.SPED_COD_CTA = pc.userdef1
-	left join spedtbl004 n5 on n5.SPED_COD_CTA = n6.SPED_COD_CTA_SUP
-	left join spedtbl004 n4 on n4.SPED_COD_CTA = n5.SPED_COD_CTA_SUP
-	left join spedtbl004 n3 on n3.SPED_COD_CTA = n4.SPED_COD_CTA_SUP
-	left join spedtbl004 n2 on n2.SPED_COD_CTA = n3.SPED_COD_CTA_SUP
-	left join spedtbl004 n1 on n1.SPED_COD_CTA = n2.SPED_COD_CTA_SUP
-	where s.YEAR1 =@vanio and n1.SPED_COD_CTA=g.SPED_COD_CTA)
-	when 2 then (select case when abs(SUM(s.CRDTAMNT))>abs(SUM(s.DEBITAMT)) then 'C' else 'D' end
-	from GL10111 s
-	left join GL00100 pc on s.ACTINDX = pc.actindx
-	left join SPEDtbl004 n6 on n6.SPED_COD_CTA = pc.userdef1
-	left join spedtbl004 n5 on n5.SPED_COD_CTA = n6.SPED_COD_CTA_SUP
-	left join spedtbl004 n4 on n4.SPED_COD_CTA = n5.SPED_COD_CTA_SUP
-	left join spedtbl004 n3 on n3.SPED_COD_CTA = n4.SPED_COD_CTA_SUP
-	left join spedtbl004 n2 on n2.SPED_COD_CTA = n3.SPED_COD_CTA_SUP
-	left join spedtbl004 n1 on n1.SPED_COD_CTA = n2.SPED_COD_CTA_SUP
-	where s.YEAR1 =@vanio and n2.SPED_COD_CTA=g.SPED_COD_CTA)
-	when 3 then (select case when abs(SUM(s.CRDTAMNT))>abs(SUM(s.DEBITAMT)) then 'C' else 'D' end
-	from GL10111 s
-	left join GL00100 pc on s.ACTINDX = pc.actindx
-	left join SPEDtbl004 n6 on n6.SPED_COD_CTA = pc.userdef1
-	left join spedtbl004 n5 on n5.SPED_COD_CTA = n6.SPED_COD_CTA_SUP
-	left join spedtbl004 n4 on n4.SPED_COD_CTA = n5.SPED_COD_CTA_SUP
-	left join spedtbl004 n3 on n3.SPED_COD_CTA = n4.SPED_COD_CTA_SUP
-	left join spedtbl004 n2 on n2.SPED_COD_CTA = n3.SPED_COD_CTA_SUP
-	left join spedtbl004 n1 on n1.SPED_COD_CTA = n2.SPED_COD_CTA_SUP
-	where s.YEAR1 =@vanio and n3.SPED_COD_CTA=g.SPED_COD_CTA)
-	when 4 then (select case when abs(SUM(s.CRDTAMNT))>abs(SUM(s.DEBITAMT)) then 'C' else 'D' end
-	from GL10111 s
-	left join GL00100 pc on s.ACTINDX = pc.actindx
-	left join SPEDtbl004 n6 on n6.SPED_COD_CTA = pc.userdef1
-	left join spedtbl004 n5 on n5.SPED_COD_CTA = n6.SPED_COD_CTA_SUP
-	left join spedtbl004 n4 on n4.SPED_COD_CTA = n5.SPED_COD_CTA_SUP
-	left join spedtbl004 n3 on n3.SPED_COD_CTA = n4.SPED_COD_CTA_SUP
-	left join spedtbl004 n2 on n2.SPED_COD_CTA = n3.SPED_COD_CTA_SUP
-	left join spedtbl004 n1 on n1.SPED_COD_CTA = n2.SPED_COD_CTA_SUP
-	where s.YEAR1 =@vanio and n4.SPED_COD_CTA=g.SPED_COD_CTA)
-	when 5 then (select case when abs(SUM(s.CRDTAMNT))>abs(SUM(s.DEBITAMT)) then 'C' else 'D' end
-	from GL10111 s
-	left join GL00100 pc on s.ACTINDX = pc.actindx
-	left join SPEDtbl004 n6 on n6.SPED_COD_CTA = pc.userdef1
-	left join spedtbl004 n5 on n5.SPED_COD_CTA = n6.SPED_COD_CTA_SUP
-	left join spedtbl004 n4 on n4.SPED_COD_CTA = n5.SPED_COD_CTA_SUP
-	left join spedtbl004 n3 on n3.SPED_COD_CTA = n4.SPED_COD_CTA_SUP
-	left join spedtbl004 n2 on n2.SPED_COD_CTA = n3.SPED_COD_CTA_SUP
-	left join spedtbl004 n1 on n1.SPED_COD_CTA = n2.SPED_COD_CTA_SUP
-	where s.YEAR1 =@vanio and n5.SPED_COD_CTA=g.SPED_COD_CTA)
-	end as tipo
+	where s.YEAR1 =@vanio and ltrim(rtrim(pc.USERDEF1)) like ltrim(rtrim(g.sped_cod_cta))+'%'),0)
+	as tipo
 from SPEDtbl004 g
 where G.SPED_COD_NAT IN (4)) order by g.SPED_COD_CTA
 open Resultado_Cursor
