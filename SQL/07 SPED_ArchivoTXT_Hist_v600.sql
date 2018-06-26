@@ -1,6 +1,6 @@
 USE [GBRA]
 GO
-/****** Object:  StoredProcedure [dbo].[SPED_ArchivoTXT_Hist_v600]    Script Date: 6/22/2018 6:03:27 PM ******/
+/****** Object:  StoredProcedure [dbo].[SPED_ArchivoTXT_Hist_v600]    Script Date: 6/26/2018 4:19:26 PM ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -10,7 +10,7 @@ GO
 -- Create date: <Create Date,,>
 -- Description:	<Description,,>
 -- =============================================
-ALTER PROCEDURE [dbo].[SPED_ArchivoTXT_Hist_v600] 
+create PROCEDURE [dbo].[SPED_ArchivoTXT_Hist_v600] 
 	@IdCompañia varchar (8),
 	@FechaDesde varchar(10),
 	@FechaHasta varchar(10)

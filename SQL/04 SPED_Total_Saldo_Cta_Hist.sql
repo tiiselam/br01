@@ -1,6 +1,6 @@
 USE [GBRA]
 GO
-/****** Object:  StoredProcedure [dbo].[SPED_Total_Saldo_Cta_Hist]    Script Date: 6/22/2018 5:58:36 PM ******/
+/****** Object:  StoredProcedure [dbo].[SPED_Total_Saldo_Cta_Hist]    Script Date: 6/26/2018 4:17:11 PM ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -10,7 +10,7 @@ GO
 -- Create date: <Create Date,,>
 -- Description:	<Description,,>
 -- =============================================
-CREATE PROCEDURE [dbo].[SPED_Total_Saldo_Cta_Hist]
+create PROCEDURE [dbo].[SPED_Total_Saldo_Cta_Hist]
 	@actindx as int,
 	@year1 as int,
 	@periodid as int,
