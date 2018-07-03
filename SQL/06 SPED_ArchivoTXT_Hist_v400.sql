@@ -1,6 +1,6 @@
 USE [GBRA]
 GO
-/****** Object:  StoredProcedure [dbo].[SPED_ArchivoTXT_Open_v400]    Script Date: 6/22/2018 6:05:31 PM ******/
+/****** Object:  StoredProcedure [dbo].[SPED_ArchivoTXT_Hist_v400]    Script Date: 6/26/2018 4:18:57 PM ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -10,7 +10,7 @@ GO
 -- Create date: <Create Date,,>
 -- Description:	<Description,,>
 -- =============================================
-ALTER PROCEDURE [dbo].[SPED_ArchivoTXT_Open_v400] 
+create PROCEDURE [dbo].[SPED_ArchivoTXT_Hist_v400] 
 	@IdCompañia varchar (8),
 	@FechaDesde varchar(10),
 	@FechaHasta varchar(10)
@@ -294,9 +294,9 @@ begin
 		where ac.HSTYEAR=@vanio and ac.PERIODID = @vper
 		group by ac.HSTYEAR,ac.PERIODID,ac.JRNENTRY,ac.TRXDATE
 	union
-	select JRNENTRY,TRXDATE,sum(CRDTAMNT),sum(DEBITAMT) from GL20000 AC 
-		where ac.OPENYEAR=@vanio and ac.PERIODID = @vper 
-		group by ac.OPENYEAR,ac.PERIODID,ac.JRNENTRY,ac.TRXDATE ) order by JRNENTRY
+	select JRNENTRY,TRXDATE,sum(CRDTAMNT),sum(DEBITAMT) from GL30000 AC 
+		where ac.HSTYEAR=@vanio and ac.PERIODID = @vper 
+		group by ac.HSTYEAR,ac.PERIODID,ac.JRNENTRY,ac.TRXDATE ) order by JRNENTRY
 	open total_asientos_cursor 
 	fetch next from total_asientos_cursor into @jrnentry,@trxdate,@crdtamnt,@debitamt
 	while @@fetch_status =0
@@ -319,7 +319,7 @@ begin
 				'|'+			----COD_HIST_PAD
 				LTRIM(RTRIM(replace(ac.refrence,'|','')))+'|'+			----HIST
 				'|'	,'')		----COD_PART
-			from GL20000 AC
+			from GL30000 AC
 			left join gl00100 pc on pc.actindx=ac.ACTINDX
 			WHERE ac.JRNENTRY =@JRNENTRY
 		fetch next from total_asientos_cursor into @jrnentry,@trxdate,@crdtamnt,@debitamt
@@ -350,7 +350,7 @@ DEALLOCATE periodos_cursor;
 			where j.SPED_COD_NAT=4 and ac.YEAR1=@vanio and PERIODID<>0
 			group by AC.ACTINDX union select AC.ACTINDX,case when sum(ac.CRDTAMNT)>sum(AC.DEBITAMT) then sum(aC.CRDTAMNT)-sum(AC.DEBITAMT) else 0 end as d,
 					case when sum(ac.CRDTAMNT)<sum(AC.DEBITAMT) then sum(aC.DEBITAMT)-sum(AC.CRDTAMNT) else 0 end as c
-			FROM GL10110 AC
+			FROM GL10111 AC
 			LEFT JOIN GL00100 PC ON PC.ACTINDX=ac.ACTINDX
 			LEFT JOIN SPEDtbl004 J ON J.SPED_COD_CTA=pc.USERDEF1
 			where j.SPED_COD_NAT=4 and ac.YEAR1=@vanio and PERIODID<>0
@@ -379,10 +379,10 @@ DEALLOCATE periodos_cursor;
 				'|'+			----COD_HIST_PAD
 				'Apuração do Resultado|'+			----HIST
 				'|'	,'')		----COD_PART
-			from GL20000 AC
+			from GL30000 AC
 			left join gl00100 pc on pc.actindx=ac.ACTINDX
 			LEFT JOIN SPEDtbl004 J ON J.SPED_COD_CTA=pc.USERDEF1
-			where (j.SPED_COD_NAT=4) and ac.OPENYEAR=@vanio
+			where (j.SPED_COD_NAT=4) and ac.HSTYEAR=@vanio
 			group by pc.USERDEF1,pc.ACTNUMBR_1,pc.ACTNUMBR_2 
 			order by rtrim(left(pc.USERDEF1,10))+'.'+pc.ACTNUMBR_1,pc.ACTNUMBR_2
 set @contador=@contador+1
@@ -445,17 +445,17 @@ DECLARE @RSped_cod_cta_n4 varchar(50)
 DECLARE @RSped_cod_cta_n5 varchar(50)
 DECLARE @CtaUtilGP varchar(50)
 Set @CtaUtilGP=(select USERDEF1 from GL40000 a inner join GL00100 b on a.RERINDX=b.ACTINDX)
-set @rMontoC=isnull((select SUM(abs(r.CRDTAMNT)) from GL10110 R
+set @rMontoC=isnull((select SUM(abs(r.CRDTAMNT)) from GL10111 R
 inner join GL00100 p on p.ACTINDX=r.ACTINDX
 inner join SPEDtbl004 j on j.SPED_COD_CTA=p.USERDEF1
 where j.SPED_COD_NAT=4 and r.YEAR1=@vanio),0)
 /******/
-set @rMontoD=isnull((select SUM(abs(r.DEBITAMT)) from gl10110 R
+set @rMontoD=isnull((select SUM(abs(r.DEBITAMT)) from GL10111 R
 inner join GL00100 p on p.ACTINDX=r.ACTINDX
 inner join SPEDtbl004 j on j.SPED_COD_CTA=p.USERDEF1
 where j.SPED_COD_NAT=4 and r.YEAR1=@vanio),0)
 /******/
-set @rMonto=isnull((select SUM(r.PERDBLNC) from gl10110 R
+set @rMonto=isnull((select SUM(r.PERDBLNC) from GL10111 R
 inner join GL00100 p on p.ACTINDX=r.ACTINDX
 inner join SPEDtbl004 j on j.SPED_COD_CTA=p.USERDEF1
 where j.SPED_COD_NAT=4 and r.YEAR1=@vanio),0)
@@ -479,22 +479,22 @@ g.SPED_NIVEL,
 g.SPED_COD_NAT,
 g.ACTDESCR,
 isnull((select abs(isnull(sum(s.DEBITAMT-s.CRDTAMNT),0))						-----saldo inicial en año abierto
-	from GL10110 s
+	from GL10111 s
 	left join GL00100 pc on s.ACTINDX = pc.actindx
 	where s.YEAR1 =@vanio and ltrim(rtrim(pc.USERDEF1)) like ltrim(rtrim(g.sped_cod_cta))+'%' and PERIODID =0),0)
 	as inicial,
 isnull((select case when sum(abs(s.CRDTAMNT))>sum(abs(s.DEBITAMT)) then 'C' else 'D' end
-	from gl10110 s
+	from GL10111 s
 	left join GL00100 pc on s.ACTINDX = pc.actindx
 	where s.YEAR1 =@vanio and ltrim(rtrim(pc.USERDEF1)) like ltrim(rtrim(g.sped_cod_cta))+'%' and PERIODID =0),0)
 	as tipoInicial,
 isnull((select abs(isnull((select sum(S.PERDBLNC)),0)+case when ltrim(rtrim(@CtaUtilGP)) like ltrim(rtrim(g.sped_cod_cta))+'%' then  @RMonto else 0 end)
-	from GL10110 s
+	from GL10111 s
 	left join GL00100 pc on s.ACTINDX = pc.actindx
 	where s.YEAR1 =@vanio and ltrim(rtrim(pc.USERDEF1)) like ltrim(rtrim(g.sped_cod_cta))+'%'),0)
 	 as saldo,
 isnull((select case when isnull(SUM(ABS(s.CRDTAMNT)),0)+case when ltrim(rtrim(@CtaUtilGP)) like ltrim(rtrim(g.sped_cod_cta))+'%' then  @RMontoc else 0 end>isnull(SUM(ABS(s.DEBITAMT)),0)+case when ltrim(rtrim(@CtaUtilGP)) like ltrim(rtrim(g.sped_cod_cta))+'%' then  @RMontoc else 0 end then 'C' else 'D' end
-	from GL10110 s
+	from GL10111 s
 	left join GL00100 pc on s.ACTINDX = pc.actindx
 	where s.YEAR1 =@vanio and ltrim(rtrim(pc.USERDEF1)) like ltrim(rtrim(g.sped_cod_cta))+'%'),0)
 	as tipo
@@ -533,13 +533,13 @@ g.SPED_NIVEL,
 g.SPED_COD_NAT,
 g.ACTDESCR,
 isnull((select abs(SUM(s.DEBITAMT)-SUM(s.CRDTAMNT))
-	from GL10110 s
+	from GL10111 s
 	left join GL00100 pc on s.ACTINDX = pc.actindx
 	left join SPEDtbl004 sc on pc.USERDEF1=sc.SPED_COD_CTA
 	where s.YEAR1 =@vanio and ltrim(rtrim(PC.USRDEFS1)) like ltrim(rtrim(g.sped_codagl)) +'%'),0)
 	 as saldo,
 isnull((select case when ABS(isnull(SUM(s.CRDTAMNT),0))>ABS(isnull(SUM(s.DEBITAMT),0)) then 'C' else 'D' end
-	from GL10110 s
+	from GL10111 s
 	left join GL00100 pc on s.ACTINDX = pc.actindx
 	left join SPEDtbl004 sc on pc.USERDEF1=sc.SPED_COD_CTA
 	where s.YEAR1 =@vanio and ltrim(rtrim(PC.USRDEFS1)) like ltrim(rtrim(g.sped_codagl)) +'%'),0)

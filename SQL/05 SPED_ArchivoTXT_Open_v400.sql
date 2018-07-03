@@ -1,6 +1,6 @@
 USE [GBRA]
 GO
-/****** Object:  StoredProcedure [dbo].[SPED_ArchivoTXT_Open_v600]    Script Date: 6/22/2018 6:06:12 PM ******/
+/****** Object:  StoredProcedure [dbo].[SPED_ArchivoTXT_Open_v400]    Script Date: 6/26/2018 4:17:49 PM ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -10,7 +10,7 @@ GO
 -- Create date: <Create Date,,>
 -- Description:	<Description,,>
 -- =============================================
-ALTER PROCEDURE [dbo].[SPED_ArchivoTXT_Open_v600] 
+create PROCEDURE [dbo].[SPED_ArchivoTXT_Open_v400] 
 	@IdCompañia varchar (8),
 	@FechaDesde varchar(10),
 	@FechaHasta varchar(10)
@@ -18,7 +18,9 @@ AS
 BEGIN
 	declare @contador int
 	set @contador=1
-
+	---CREATE TABLE spedtbl9000 (LINEA datetime,SECCION VARCHAR(4),DATOS VARCHAR(8000))
+	-- SET NOCOUNT ON added to prevent extra result sets from
+	-- interfering with SELECT statements.
 	SET NOCOUNT on;
 
     -- Insert statements for procedure here
@@ -35,10 +37,8 @@ INSERT INTO spedtbl9000 (LINEA,seccion, datos)
 		rtrim(isnull(conf.spedIE,''))+'|'+		---IE, C8
 		rtrim(isnull(com.COUNTY,''))+'|'+		--- AS CÓD_MUN, C9
 		rtrim(isnull(conf.sped_IM,''))+'|'+	--- AS IM, C10
-		rtrim(case when conf.SPED_IND_SIT_ESP=0 then '' else str(conf.SPED_IND_SIT_ESP) end)+	--- AS IND_SIT_ESP C11
-		'|0|1|0||'+cast(CONF.sped_ind_grande_porte as varchar(1))+	----- AS IND_GRANDE_PORTE C16
-		'|0||'+CASE CONF.SPED_IDENT_MF WHEN 0 THEN 'N' ELSE 'S' END+		---- AS IDENT_MF C19
-		'|N|','')
+		rtrim( case when conf.SPED_IND_SIT_ESP=0 then '' else str(conf.SPED_IND_SIT_ESP) end)+'|','')+	--- AS IND_SIT_ESP C11
+		'0|1|0|||0|0||N|'
 			---SECCION 0000
 	from dynamics.dbo.SY01500  com 
 	left join SPEDtbl001 conf on com.INTERID =conf.INTERID
@@ -58,7 +58,7 @@ insert into spedtbl9000 (linea,seccion, datos)
 insert into spedtbl9000 (linea,seccion, datos)	
 	values( @contador+5,'I010',isnull('|I010|'+	--- AS REG,
 			'G|'+		--- AS IND_ESC,
-			'6.00|'	,''))	--- AS CÓD_VER_LC						---SECCION I010
+			'4.00|'	,''))	--- AS CÓD_VER_LC						---SECCION I010
 			set @contador=@contador+5
 insert into spedtbl9000 (linea,seccion, datos)	
 	SELECT @contador+1,'I030',
@@ -88,6 +88,7 @@ declare @ACTDESCR as varchar(80)
 DECLARE @USERDEF1 AS VARCHAR(50)
 DECLARE @USERDEF2 AS VARCHAR(50)
 declare @codigogp as varchar(50)
+declare @CODAGL as varchar(50)
 declare PlanCuentas_Cursor cursor for
 (SELECT DOCDATE,
 		SPED_COD_NAT,
@@ -101,7 +102,7 @@ declare PlanCuentas_Cursor cursor for
 		'',---isnull(PC.USERDEF2,''),
 		'' ---isnull(pc.ACTNUMBR_1,'')
 		---,case when sped_ind_cta='A' then userdef1 else '1' end
-	from SPEDtbl004 gc WHERE SPED_ES_SN=1
+	from SPEDtbl004 gc WHERE GC.SPED_ES_SN=1
 	----left join GL00100 pc on pc.USERDEF1=gc.SPED_COD_CTA
 	/*where SPED_NIVEL <=4*/
 	) ---(case when sped_ind_cta='A' then userdef1 else '1' end) is not null)
@@ -138,12 +139,12 @@ begin
 	end
 	if @SPED_IND_CTA='A'
 	begin
-		declare Cuentas_gp cursor for (select ACTNUMBR_1,USERDEF1,max(cgp.ACTDESCR) as ACTDESCR  from gl00100 cgp 
+		declare Cuentas_gp cursor for (select ACTNUMBR_1,USERDEF1,max(cgp.ACTDESCR) as ACTDESCR,USRDEFS1  from gl00100 cgp 
 		where LTRIM(RTRIM(USERDEF1))=@sped_cod_cta 
-		group by ACTNUMBR_1,userdef1) ---,ACTDESCR)
+		group by ACTNUMBR_1,userdef1,USRDEFS1) ---,ACTDESCR)
 		order by ACTNUMBR_1
 		open Cuentas_gp
-		fetch next from cuentas_gp into @codigogp,@userdef1,@Actdescr
+		fetch next from cuentas_gp into @codigogp,@userdef1,@Actdescr,@CODAGL
 		while @@FETCH_STATUS=0
 		begin
 			set @contador=@contador+1
@@ -167,8 +168,8 @@ begin
 			set @contador=@contador+1
 			insert into spedtbl9000 (linea,seccion, datos)	
 				VALUES (@contador+1,'I052',
-						isnull('|I052|'+'|'+replace(rtrim(ltrim(@SPED_COD_CTA)),'.','')+'|',''))	--- AS COD_AGL,
-			fetch next from cuentas_gp into @codigogp,@userdef1,@Actdescr
+						isnull('|I052|'+'|'+replace(rtrim(ltrim(@CODAGL)),'.','')+'|',''))	--- AS COD_AGL,
+			fetch next from cuentas_gp into @codigogp,@userdef1,@Actdescr,@CODAGL
 		end
 		close cuentas_gp
 		deallocate cuentas_gp
@@ -289,11 +290,11 @@ begin
 	declare @CRDTAMNT as decimal(18,2)
 	declare @DEBITAMT as decimal(18,2)
 	declare total_asientos_cursor cursor for
-	(select JRNENTRY,TRXDATE,sum(case when CRDTAMNT>0 then CRDTAMNT else case when DEBITAMT<0 then abs(DEBITAMT) else 0 end end),sum(case when DEBITAMT>0 then DEBITAMT else case when CRDTAMNT<0 then abs(crdtamnt) else 0 end end) from GL30000 AC 
+	(select JRNENTRY,TRXDATE,sum(CRDTAMNT),sum(DEBITAMT) from GL30000 AC 
 		where ac.HSTYEAR=@vanio and ac.PERIODID = @vper
 		group by ac.HSTYEAR,ac.PERIODID,ac.JRNENTRY,ac.TRXDATE
 	union
-	select JRNENTRY,TRXDATE,sum(case when CRDTAMNT>0 then CRDTAMNT else case when DEBITAMT<0 then abs(DEBITAMT) else 0 end end),sum(case when DEBITAMT>0 then DEBITAMT else case when CRDTAMNT<0 then abs(crdtamnt) else 0 end end) from GL20000 AC 
+	select JRNENTRY,TRXDATE,sum(CRDTAMNT),sum(DEBITAMT) from GL20000 AC 
 		where ac.OPENYEAR=@vanio and ac.PERIODID = @vper 
 		group by ac.OPENYEAR,ac.PERIODID,ac.JRNENTRY,ac.TRXDATE ) order by JRNENTRY
 	open total_asientos_cursor 
@@ -312,7 +313,7 @@ begin
 				isnull('|I250|'+						----REG
 				rtrim(ltrim(left(pc.USERDEF1,10)))+'.'+rtrim(pc.actnumbr_1)+'|'+	----COD_CTA
 				rtrim(ltrim(pc.ACTNUMBR_2))+'|'+ ---COD_CCUS
-				isnull(LTRIM(RTRIM(REPLACE(cast(convert(decimal(10,2),abs(ac.DEBITAMT)+abs(ac.CRDTAMNT))AS nvarchar),'.',','))),'0,00')+'|'+			----VL_DC
+				isnull(LTRIM(RTRIM(REPLACE(cast(convert(decimal(10,2),ac.DEBITAMT+ac.CRDTAMNT)AS nvarchar),'.',','))),'0,00')+'|'+			----VL_DC
 				CASE WHEN ac.DEBITAMT>0 THEN 'D' ELSE 'C' END +'|'+			----IND_DC
 				LTRIM(RTRIM(str(ac.jrnentry)))+'|'+			----NUM_ARQ
 				'|'+			----COD_HIST_PAD
@@ -447,20 +448,12 @@ Set @CtaUtilGP=(select USERDEF1 from GL40000 a inner join GL00100 b on a.RERINDX
 set @rMontoC=isnull((select SUM(abs(r.CRDTAMNT)) from GL10110 R
 inner join GL00100 p on p.ACTINDX=r.ACTINDX
 inner join SPEDtbl004 j on j.SPED_COD_CTA=p.USERDEF1
-where j.SPED_COD_NAT=4 and r.YEAR1=@vanio),0)/*+
-isnull((select SUM(abs(r.CRDTAMNT)) from GL10110 R
-inner join GL00100 p on p.ACTINDX=r.ACTINDX
-inner join SPEDtbl004 j on j.SPED_COD_CTA=p.USERDEF1
-where j.SPED_COD_NAT=4 and r.YEAR1=@vanio),0)*/
+where j.SPED_COD_NAT=4 and r.YEAR1=@vanio),0)
 /******/
 set @rMontoD=isnull((select SUM(abs(r.DEBITAMT)) from gl10110 R
 inner join GL00100 p on p.ACTINDX=r.ACTINDX
 inner join SPEDtbl004 j on j.SPED_COD_CTA=p.USERDEF1
-where j.SPED_COD_NAT=4 and r.YEAR1=@vanio),0)/*+
-isnull((select SUM(abs(r.DEBITAMT)) from gl10110 R
-inner join GL00100 p on p.ACTINDX=r.ACTINDX
-inner join SPEDtbl004 j on j.SPED_COD_CTA=p.USERDEF1
-where j.SPED_COD_NAT=4 and r.YEAR1=@vanio),0)*/
+where j.SPED_COD_NAT=4 and r.YEAR1=@vanio),0)
 /******/
 set @rMonto=isnull((select SUM(r.PERDBLNC) from gl10110 R
 inner join GL00100 p on p.ACTINDX=r.ACTINDX
@@ -481,7 +474,7 @@ set @RSped_Cod_Cta_N1=(select j.SPED_COD_CTA_SUP from SPEDtbl004 j
 declare @inicial as decimal (18,2)
 declare @tipoinicial as varchar
 declare Balance_cursor cursor for
-(select case when g.SPED_NIVEL=1 then 'TG.' else '' end+replace(rtrim(g.SPED_COD_CTA),'.',''),
+(select case when g.SPED_NIVEL=1 then 'TG.' else '' end+replace(rtrim(G.SPED_CODAGL),'.',''),
 g.SPED_NIVEL,
 g.SPED_COD_NAT,
 g.ACTDESCR,
@@ -506,7 +499,9 @@ isnull((select case when isnull(SUM(ABS(s.CRDTAMNT)),0)+case when ltrim(rtrim(@C
 	where s.YEAR1 =@vanio and ltrim(rtrim(pc.USERDEF1)) like ltrim(rtrim(g.sped_cod_cta))+'%'),0)
 	as tipo
 from SPEDtbl004 g
-where G.SPED_COD_NAT IN (1,2,3)) order by g.SPED_COD_CTA
+	LEFT JOIN GL00100 C ON C.USERDEF1=G.SPED_COD_CTA
+where G.SPED_COD_NAT IN (1,2,3)
+GROUP BY G.SPED_CODAGL,G.SPED_COD_CTA,G.SPED_NIVEL,C.USRDEFS1,G.SPED_COD_NAT,G.ACTDESCR) order by g.SPED_CODAGL
 open Balance_cursor
 fetch next from Balance_cursor into @sped_cod_cta,@SPED_NIVEL,@SPED_COD_NAT,@ACTDESCR,@inicial,@tipoinicial,@CREDITO,@TIPO
 while @@fetch_status =0
@@ -525,7 +520,7 @@ begin
 				isnull(ltrim(rtrim(REPLACE(cast(convert(decimal(18,2),@credito) as nvarchar),'.',','))),'0,00')+'|'+
 				@TIPO+'|'+
 				isnull(ltrim(rtrim(REPLACE(cast(convert(decimal(18,2),@inicial) as nvarchar),'.',','))),'0,00')+'|'+
-				@tipoinicial+'||','|')
+				@tipoinicial+'|','|')
 		end
 	END
 	fetch next from Balance_cursor into @sped_cod_cta,@SPED_NIVEL,@SPED_COD_NAT,@ACTDESCR,@inicial,@tipoinicial,@CREDITO,@TIPO
@@ -533,7 +528,7 @@ end
 CLOSE Balance_cursor;  
 DEALLOCATE Balance_cursor;
 declare Resultado_Cursor cursor for
-(select case when g.SPED_NIVEL=1 then 'TG.' else '' end+ltrim(rtrim(g.sped_codagl)),
+(select case when g.SPED_NIVEL=1 then 'TG.' else '' end+ltrim(rtrim(G.SPED_CODAGL)),
 g.SPED_NIVEL,
 g.SPED_COD_NAT,
 g.ACTDESCR,
@@ -541,16 +536,18 @@ isnull((select abs(SUM(s.DEBITAMT)-SUM(s.CRDTAMNT))
 	from GL10110 s
 	left join GL00100 pc on s.ACTINDX = pc.actindx
 	left join SPEDtbl004 sc on pc.USERDEF1=sc.SPED_COD_CTA
-	where s.YEAR1 =@vanio and ltrim(rtrim(sc.sped_codagl)) like ltrim(rtrim(g.sped_codagl)) +'%'),0)
+	where s.YEAR1 =@vanio and ltrim(rtrim(PC.USRDEFS1)) like ltrim(rtrim(g.sped_codagl)) +'%'),0)
 	 as saldo,
 isnull((select case when ABS(isnull(SUM(s.CRDTAMNT),0))>ABS(isnull(SUM(s.DEBITAMT),0)) then 'C' else 'D' end
 	from GL10110 s
 	left join GL00100 pc on s.ACTINDX = pc.actindx
 	left join SPEDtbl004 sc on pc.USERDEF1=sc.SPED_COD_CTA
-	where s.YEAR1 =@vanio and ltrim(rtrim(sc.sped_codagl)) like ltrim(rtrim(g.sped_codagl)) +'%'),0)
+	where s.YEAR1 =@vanio and ltrim(rtrim(PC.USRDEFS1)) like ltrim(rtrim(g.sped_codagl)) +'%'),0)
 	as tipo
 from SPEDtbl004 g
-where G.SPED_COD_NAT IN (4)) order by g.sped_codagl
+LEFT JOIN GL00100 C ON C.USERDEF1=G.SPED_COD_CTA
+where G.SPED_COD_NAT IN (4)
+GROUP BY G.SPED_CODAGL,G.SPED_NIVEL,SPED_COD_NAT,G.ACTDESCR) order by g.sped_codagl
 open Resultado_Cursor
 fetch next from Resultado_Cursor into @sped_cod_cta,@SPED_NIVEL,@SPED_COD_NAT,@ACTDESCR,@CREDITO,@TIPO
 while @@fetch_status =0
@@ -564,7 +561,7 @@ begin
 				LTRIM(STR(@SPED_NIVEL))+'|'+
 				RTRIM(@ACTDESCR)+'|'+
 				isnull(ltrim(rtrim(REPLACE(cast(convert(decimal(10,2),@credito) as nvarchar),'.',','))),'0,00')+'|'+
-				CASE WHEN @TIPO='C' THEN 'N' ELSE 'P' END+'|','')+'|||'
+				CASE WHEN @TIPO='C' THEN 'N' ELSE 'P' END+'|','')+'||'
 	END
 	fetch next from Resultado_Cursor into @sped_cod_cta,@SPED_NIVEL,@SPED_COD_NAT,@ACTDESCR,@CREDITO,@TIPO
 end
