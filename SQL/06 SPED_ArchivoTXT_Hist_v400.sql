@@ -238,9 +238,9 @@ WHILE @@FETCH_STATUS = 0
 		declare @texto as varchar(800)
 		WHILE @@FETCH_STATUS = 0  
 		begin
-			exec SPED_Total_Saldo_Cta_Open @actindx,@vanio,@vper,1,@debito out,@credito out,@tieneM output
-			exec SPED_Total_Saldo_Cta_Open @actindx,@vanio,@vper,2,@idebito out,@icredito out,@tieneI output
-			exec SPED_Total_Saldo_Cta_Open @actindx,@vanio,@vper,3,@fdebito out,@fcredito out,@tieneF output
+			exec SPED_Total_Saldo_Cta_Hist @actindx,@vanio,@vper,1,@debito out,@credito out,@tieneM output
+			exec SPED_Total_Saldo_Cta_Hist @actindx,@vanio,@vper,2,@idebito out,@icredito out,@tieneI output
+			exec SPED_Total_Saldo_Cta_Hist @actindx,@vanio,@vper,3,@fdebito out,@fcredito out,@tieneF output
 			set @texto= isnull(LTRIM(RTRIM(REPLACE(CAST(abs(@idebito-@icredito) as nvarchar),'.',','))),'0,00')+'|'+
 						isnull(case when @idebito>=@icredito then 'D' else 'C' end,'D')+'|'+
 						REPLACE(LTRIM(RTRIM(cast(convert(decimal(18,2),isnull(@debito,0)) AS nvarchar))),'.',',')+'|'+
@@ -333,7 +333,7 @@ DEALLOCATE periodos_cursor;
 		set @actindx=(select RERINDX from GL40000)
 		set @sped_cod_cta=(select rtrim(left(p.userdef1,10))+'.'+rtrim(p.actnumbr_1) from GL00100 p left join SPEDtbl004 j on j.SPED_COD_CTA=p.USERDEF1 where p.ACTINDX=@actindx)
 		set @sgmtid=(select rtrim(p.actnumbr_2) from GL00100 p left join SPEDtbl004 j on j.SPED_COD_CTA=p.USERDEF1 where p.actindx=@actindx)
-		exec SPED_Total_Saldo_Cta_Open @actindx,@vanio,12,1,@debitamt out,@crdtamnt out,@tieneF out
+		exec SPED_Total_Saldo_Cta_Hist @actindx,@vanio,12,1,@debitamt out,@crdtamnt out,@tieneF out
 		declare @resultado as decimal(18,2)
 		set @resultado=@debitamt-@CRDTAMNT
 		set @contador=@contador+1
