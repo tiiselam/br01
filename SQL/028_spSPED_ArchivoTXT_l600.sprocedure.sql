@@ -1,6 +1,15 @@
 USE [GBRA]
 GO
 
+IF EXISTS (
+  SELECT * 
+    FROM INFORMATION_SCHEMA.ROUTINES 
+   WHERE SPECIFIC_SCHEMA = 'dbo'
+     AND SPECIFIC_NAME = 'SPED_ArchivoTXT_l600' 
+)
+   DROP PROCEDURE dbo.SPED_ArchivoTXT_l600;
+GO
+
 -- =========================================================================================================================
 -- Propósito. Genera los datos del archivo SPED en la tabla spedtbl9000
 -- Requisito. El mapeo de plan de cuentas debe estar en el campo gl00100.userdef1
@@ -9,7 +18,8 @@ GO
 --			El campo SPED_CODAGL es el código agrupador. Puede diferir del sped_cod_cuenta.
 --			El campo SPED_IND_CTA debe indicar el valor A cuando es el último nivel, S cuando es cualquier otro nivel
 --2017.. ltoro
---24/6/19 jcf Redefine funciones de generación de saldos y extiende el uso de jerarquia de cuentas de cualquier nivel
+--24/06/19 jcf Redefine funciones de generación de saldos y extiende el uso de jerarquia de cuentas de cualquier nivel
+--05/08/19 jcf Obtiene código referencial de userdef2
 -- =========================================================================================================================
 
 create PROCEDURE [dbo].[SPED_ArchivoTXT_l600] 
@@ -139,14 +149,14 @@ begin
 	if @SPED_IND_CTA='A'
 	begin
 		declare Cuentas_gp cursor for 
-		(select cuentaGP, cuentaSped, max(cgp.ACTDESCR) as ACTDESCR  
+		(select cuentaGP, cuentaSped, cuentaRefSped, max(cgp.ACTDESCR) as ACTDESCR  
 		from dbo.vwSpedPlanDeCuentasGP cgp 
 		where cgp.cuentaSped = rtrim(@sped_cod_cta)
-		group by cuentaGP, cuentaSped)
+		group by cuentaGP, cuentaSped, cuentaRefSped)
 		order by cuentaGP
 
 		open Cuentas_gp
-		fetch next from cuentas_gp into @codigogp, @USERDEF1, @Actdescr
+		fetch next from cuentas_gp into @codigogp, @USERDEF1, @USERDEF2, @Actdescr
 		while @@FETCH_STATUS=0
 		begin
 			set @contador=@contador+1
@@ -166,18 +176,18 @@ begin
 						isnull('|I051|'+					--- AS REG,
 						'1|'+								--- AS CÓD_PLAN_REF
 						'|'+								--- AS CÓD_CCUS,
-						rtrim(LTRIM(@USERDEF1))+'|',''))	--- CÓD_CTA_REF
+						rtrim(LTRIM(@USERDEF2))+'|',''))	--- CÓD_CTA_REF
 			set @contador=@contador+1
 			insert into spedtbl9000 (linea,seccion, datos)	
 				VALUES (@contador+1,'I052',
 						--isnull('|I052|'+'|'+replace(rtrim(ltrim(@SPED_COD_CTA)),'.','')+'|',''))	--- AS COD_AGL,
 						isnull('|I052|'+'|'+rtrim(@SPED_CODAGL)+'|',''))	--- AS COD_AGL,
-			fetch next from cuentas_gp into @codigogp,@USERDEF1,@Actdescr
+			fetch next from cuentas_gp into @codigogp, @USERDEF1, @USERDEF2, @Actdescr
 		end
 		close cuentas_gp
 		deallocate cuentas_gp
 	end
-	FETCH NEXT FROM PlanCuentas_Cursor into @docdate,@SPED_COD_NAT ,@sped_cod_cta,@SPED_IND_CTA,@SPED_NIVEL,@SPED_COD_CTA_SUP,@SPED_CTA,@ACTDESCR, @SPED_CODAGL	--@USERDEF1,@USERDEF2,@codigogp
+	FETCH NEXT FROM PlanCuentas_Cursor into @docdate,@SPED_COD_NAT ,@sped_cod_cta,@SPED_IND_CTA,@SPED_NIVEL,@SPED_COD_CTA_SUP,@SPED_CTA,@ACTDESCR, @SPED_CODAGL
 end
 close PlanCuentas_Cursor
 deallocate PlanCuentas_Cursor;
@@ -680,3 +690,7 @@ update SPEDtbl9000 set datos=replace(datos,'*',cast(@contador as varchar)) where
 
 end
 go
+-----------------------------------------------------------------------
+IF (@@Error = 0) PRINT 'Creación exitosa de: SPED_ArchivoTXT_l600'
+ELSE PRINT 'Error en la creación de: SPED_ArchivoTXT_l600'
+GO
