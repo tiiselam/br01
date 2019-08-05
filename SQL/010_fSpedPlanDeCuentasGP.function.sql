@@ -11,7 +11,7 @@ alter view dbo.vwSpedPlanDeCuentasGP
 --Requisitos. 
 --18/06/19 jcf Creación
 as
-	select actindx, rtrim(ACTNUMBR_1) cuentaGp, rtrim(ACTNUMBR_2) centroCostoGp, rtrim(USERDEF1) cuentaSped, 
+	select actindx, rtrim(ACTNUMBR_1) cuentaGp, rtrim(ACTNUMBR_2) centroCostoGp, rtrim(USERDEF1) cuentaSped, rtrim(USERDEF2) cuentaRefSped,
 			case when cgp.accatnum in (31, 32, 43, 45, 46) then 'R' else 'D' end tipoResultado, 
 			--31 sales, 32 sales returns, 43 Other Income, 45 Revenues Not Producing Working Capital, 46 Gain/Loss on Asset Disposal
 			rtrim(cgp.ACTDESCR) ACTDESCR,
