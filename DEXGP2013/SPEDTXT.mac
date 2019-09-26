@@ -1,17 +1,17 @@
 # DEXVERSION=10.0.193.0 2 2
   MenuSelect title File entry 'Open Source Dictionary...' 
-  FileOpen file ':C:jcTii/Desarrollo/GPDex/scc/BraSpedGP2013R2Pr/DynGP2013R2Dev.dic' type 0 
+  FileOpen file ':C:TiiSelam/DESA_MSAL/br01/DEXGP2013/DynGp2013R2v12001920Dev.dic' type 0 
 ActivateWindow dictionary 'default'  form 'Main Menu' window 'DexUtils Toolbar' 
   ClickHit field 'Toolbar Utilities Button' item 6  # 'Extract' 
 NewActiveWin dictionary 'default'  form Extractor window Extractor 
 ActivateWindow dictionary 'default'  form Extractor window Extractor 
   ClickHit field '(L) Extract Button' 
-  FileSave file ':C:jcTii/Desarrollo/GPDex/scc/BraSpedGP2013R2Pr/extSPEDTXT.dic' 
+  FileSave file ':C:TiiSelam/DESA_MSAL/br01/DEXGP2013/extSPEDTXT.dic' 
 NewActiveWin dictionary 'default'  form Extractor window Extractor 
 NewActiveWin dictionary 'default'  form Extractor window Extractor 
   MenuSelect title File entry 'Close Source Dictionary' 
   MenuSelect title File entry 'Open Editable Dictionary...' 
-  FileOpen file ':C:jcTii/Desarrollo/GPDex/scc/BraSpedGP2013R2Pr/extSPEDTXT.dic' type 0 
+  FileOpen file ':C:TiiSelam/DESA_MSAL/br01/DEXGP2013/extSPEDTXT.dic' type 0 
 ActivateWindow dictionary 'default'  form 'Main Menu' window 'DexUtils Toolbar' 
   ClickHit field 'Toolbar Utilities Button' item 9  # 'Auto-Chunk' 
 NewActiveWin dictionary 'default'  form 'Auto Chunk' window 'Auto Chunk' 
@@ -41,7 +41,7 @@ ActivateWindow dictionary 'default'  form 'Product Res' window 'Product Resource
   ClickHit field 'Ok Button' 
 NewActiveWin dictionary 'default'  form 'Auto Chunk' window 'Auto Chunk' 
   ClickHit field 'Lookup Button 3'
-  FileSave file ':C:jcTii/Desarrollo/GPDex/scc/BraSpedGP2013R2Pr/SPEDTXT.cnk'
+  FileSave file ':C:TiiSelam/DESA_MSAL/br01/DEXGP2013/SPEDTXT.cnk'
   MoveTo field 'Dictionary Name'  
   TypeTo field 'Dictionary Name' , 'SPEDTXT.dic'
   ClickHit field 'Accounting Modules' item 54  # 'Module 054' 
