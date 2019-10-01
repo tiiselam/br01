@@ -1,16 +1,18 @@
 USE [GBRA]
 GO
 
-/****** Object:  StoredProcedure [dbo].[SPED_GeneraArchivoECFEnTabla]    Script Date: 26/09/2019 06:49:03 ******/
+/****** Object:  StoredProcedure [dbo].[SPED_GeneraArchivoECFEnTabla]    Script Date: 01/10/2019 08:02:35 ******/
 DROP PROCEDURE [dbo].[SPED_GeneraArchivoECFEnTabla]
 GO
 
-/****** Object:  StoredProcedure [dbo].[SPED_GeneraArchivoECFEnTabla]    Script Date: 26/09/2019 06:49:03 ******/
+/****** Object:  StoredProcedure [dbo].[SPED_GeneraArchivoECFEnTabla]    Script Date: 01/10/2019 08:02:35 ******/
 SET ANSI_NULLS ON
 GO
 
 SET QUOTED_IDENTIFIER ON
 GO
+
+
 
 
 -- =========================================================================================================================
@@ -30,16 +32,14 @@ BEGIN
 	select @layout = parametros.param1
 	from dbo.fSpedParametros('LAYOUTECF'+convert(varchar(4), YEAR(@FechaHasta)), 'na', 'na', 'na', 'na', 'na', 'SPED') parametros
 
-	if (@layout = '300')		--ecf layout 3
-		exec [dbo].[SPED_ArchivoTXT_ECF_v300] @IdCompañia, @FechaDesde, @FechaHasta; 
-	else if (@layout = '400')		--ecf layout 4
-		exec [dbo].[SPED_ArchivoTXT_ECF_v400] @IdCompañia, @FechaDesde, @FechaHasta; 
-	else if (@layout = '500')		--ecf layout 5
+	if (@layout = '500')		--ecf layout 5
 		exec [dbo].[SPED_ArchivoTXT_ECF_l500] @IdCompañia, @FechaDesde, @FechaHasta; 
 	else 
 		INSERT INTO spedtbl9000 (LINEA,seccion, datos) 
 				values(0, 'err', 'Verifique los parámetros SPED en la configuración de compañía: ' + @layout);
 End
+
+
 
 
 GO
