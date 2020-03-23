@@ -1,5 +1,5 @@
-USE [GBRA]
-GO
+-- USE [GBRA]
+-- GO
 
 IF EXISTS (
   SELECT * 
@@ -11,11 +11,11 @@ IF EXISTS (
 GO
 
 -- =========================================================================================================================
--- Propósito. Genera los datos del archivo SPED en la tabla spedtbl9000
+-- Propósito. Genera los datos del archivo SPED en la tabla spedtbl9000 para el layout 8.00
 -- Requisito. El mapeo de plan de cuentas debe estar en el campo gl00100.userdef1
 --			Una cuenta local puede agrupar varias cuentas GP
 --			La jerarquía de cuentas locales debe estar en SPEDtbl004. 
---			El campo SPED_CODAGL es el código agrupador. Puede diferir del sped_cod_cuenta.
+--			El campo SPED_CODAGL es el código agrupador. A partir del layour 8.00 no debe diferir del sped_cod_cuenta ya que usan el mismo código de nivel superior en J100 y J150
 --			El campo SPED_IND_CTA debe indicar el valor A cuando es el último nivel, S cuando es cualquier otro nivel
 --18/03/20 jcf Creación
 -- =========================================================================================================================
@@ -65,6 +65,9 @@ insert into spedtbl9000 (linea,seccion, datos)
 insert into spedtbl9000 (linea,seccion, datos)	
 	values( @contador+3,'0990',isnull('|0990|'+	--- AS REG,
 			'4|',''))		--- AS QTD_LIN_0							---SECCION 0990
+-- insert into spedtbl9000 (linea,seccion, datos)	
+-- 	values( @contador+4,'C001',isnull('|C001|'+	--- AS REG,
+-- 			'1|',''))		---IND_DAD									---SECCION C001
 insert into spedtbl9000 (linea,seccion, datos)	
 	values( @contador+4,'I001',isnull('|I001|'+	--- AS REG,
 			'0|',''))		---AS IND_DAD								---SECCION I001
@@ -456,7 +459,9 @@ declare @tipoinicial as varchar
 declare Balance_cursor cursor for
 (
 select		
-	case when g.SPED_NIVEL=1 then 'TG.' else '' end + RTRIM(g.SPED_CODAGL),
+	--case when g.SPED_NIVEL=1 then '' else '' end + 
+	RTRIM(g.SPED_CODAGL),
+	rtrim(g.SPED_COD_CTA_SUP),
 	g.SPED_IND_CTA,
 	g.SPED_NIVEL,
 	g.SPED_COD_NAT,
@@ -529,21 +534,19 @@ and abs(isnull(gestionActual.Saldo_Acumulado, 0)) + ABS(isnull(gestionAnterior.s
 order by g.SPED_COD_CTA
 
 open Balance_cursor
-fetch next from Balance_cursor into @SPED_CODAGL, @SPED_IND_CTA, @SPED_NIVEL, @SPED_COD_NAT, @ACTDESCR,@inicial,@tipoinicial,@Saldo,@TIPO
+fetch next from Balance_cursor into @SPED_CODAGL, @SPED_COD_CTA_SUP, @SPED_IND_CTA, @SPED_NIVEL, @SPED_COD_NAT, @ACTDESCR, @inicial, @tipoinicial, @Saldo, @TIPO
 while @@fetch_status =0
 begin
-	IF @Saldo<>0
+	IF @Saldo<>0 and @SPED_IND_CTA='S'
 	BEGIN
-		--if @SPED_NIVEL<5
-		--begin
 		set @contador=@contador+1
 		insert into spedtbl9000 (linea,seccion,datos)
 			select @contador+1,'J100',isnull('|J100|'+
 				RTRIM(@SPED_CODAGL)+'|'+											--COD_AGL
                 case when @SPED_IND_CTA = 'S' then 'T' else 'D' end +'|'+           --IND_COD_AGL
 				LTRIM(STR(@SPED_NIVEL))+'|'+										--NIVEL_AGL
-                '|'+                                                                --COD_AGL_SUP
-				case when rtrim(@SPED_COD_NAT) = '01' then '1' else '2' end+'|'+	--IND_GRP_BAL
+                REPLACE(@SPED_COD_CTA_SUP, '.', '')+'|'+                            --COD_AGL_SUP
+				case when rtrim(@SPED_COD_NAT) = '01' then 'A' else 'P' end+'|'+	--IND_GRP_BAL
 				RTRIM(@ACTDESCR)+'|'+												--DESCR_COD_AGL
 				isnull(ltrim(rtrim(REPLACE(cast(convert(decimal(18,2),@inicial) as nvarchar),'.',','))),'0,00')+'|'+    --VL_CTA_INI
 				@tipoinicial+'|'+													--IND_DC_CTA_INI
@@ -551,25 +554,28 @@ begin
 				@TIPO+'|'+															--IND_DC_CTA_FIN
                 '|'																	--NOTA_EXP_REF
 				,'|')
-		--end
 	END
-	fetch next from Balance_cursor into @SPED_CODAGL, @SPED_IND_CTA, @SPED_NIVEL,@SPED_COD_NAT,@ACTDESCR,@inicial,@tipoinicial,@Saldo,@TIPO
+	fetch next from Balance_cursor into @SPED_CODAGL, @SPED_COD_CTA_SUP, @SPED_IND_CTA, @SPED_NIVEL, @SPED_COD_NAT, @ACTDESCR, @inicial, @tipoinicial, @Saldo, @TIPO
 end
 CLOSE Balance_cursor;  
 DEALLOCATE Balance_cursor;
 --fin J100
 ----------------------------------------------------------------------------------------------
 --inicio J150
-declare @tipoResultado varchar(2);
+declare @tipoResultado varchar(2), @correlativo numeric(12);
 declare Resultado_Cursor cursor for
-	(select case when g.SPED_NIVEL=1 then 'TG.' else '' end+ltrim(rtrim(g.sped_codagl)),
+	(
+	select --case when g.SPED_NIVEL=1 then 'TG.' else '' end+
+		ltrim(rtrim(g.sped_codagl)),
+		rtrim(g.SPED_COD_CTA_SUP),
 		g.SPED_IND_CTA,
 		g.SPED_NIVEL,
 		g.SPED_COD_NAT,
 		g.ACTDESCR,
 		ABS(isnull(acumulados.saldo_acumulado, 0)) saldo,
 		case when acumulados.saldo_acumulado > 0 then 'D' else 'C' end tipo,
-		case when acumulados.saldo_acumulado > 0 then 'D' else 'R' end tipoResultado
+		case when acumulados.saldo_acumulado > 0 then 'D' else 'R' end tipoResultado,
+		ROW_NUMBER() OVER(ORDER BY g.sped_codagl) AS correlativo
 	from SPEDtbl004 g
 	outer apply (
 			select	sum(ac.perdblnc) perdblnc, 
@@ -589,7 +595,7 @@ declare Resultado_Cursor cursor for
 	order by g.sped_codagl
 
 open Resultado_Cursor
-fetch next from Resultado_Cursor into @SPED_CODAGL, @SPED_IND_CTA, @SPED_NIVEL, @SPED_COD_NAT, @ACTDESCR, @Saldo, @TIPO, @tipoResultado
+fetch next from Resultado_Cursor into @SPED_CODAGL, @SPED_COD_CTA_SUP, @SPED_IND_CTA, @SPED_NIVEL, @SPED_COD_NAT, @ACTDESCR, @Saldo, @TIPO, @tipoResultado, @correlativo
 while @@fetch_status =0
 begin
 	--IF @Saldo>0
@@ -597,15 +603,21 @@ begin
 		set @contador=@contador+1;
 		insert into spedtbl9000 (linea,seccion,datos)
 			select @contador+1,'J150', isnull('|J150|'+
-				RTRIM(@SPED_CODAGL)+'|'+											--COD_AGL
-				LTRIM(STR(@SPED_NIVEL))+'|'+										--NIVEL_AGL
-				RTRIM(@ACTDESCR)+'|'+												--DESCR_COD_AGL
-				isnull(ltrim(rtrim(REPLACE(cast(convert(decimal(10,2),@Saldo) as nvarchar),'.',','))),'0,00')+'|'+
-				CASE WHEN @TIPO='C' THEN 'N' ELSE 'P' END+'|'						--IND_VL
-			,'')+
-				'|||'
+				convert(varchar(12), @correlativo) + '|'+			--NU_ORDEM
+				RTRIM(@SPED_CODAGL)+'|'+							--COD_AGL
+                case when @SPED_IND_CTA = 'S' then 'T' else 'D' end +'|'+ --IND_COD_AGL
+				LTRIM(STR(@SPED_NIVEL))+'|'+						--NIVEL_AGL
+                REPLACE(@SPED_COD_CTA_SUP, '.', '')+'|'+            --COD_AGL_SUP
+				RTRIM(@ACTDESCR)+'|'+								--DESCR_COD_AGL
+                '|'+                                                --VL_CTA_INI
+				'|'+												--IND_DC_CTA_INI
+				isnull(ltrim(rtrim(REPLACE(cast(convert(decimal(10,2),@Saldo) as nvarchar),'.',','))),'0,00')+'|'+	--VL_CTA_FIN
+				@TIPO + '|' +										--IND_DC_CTA_FIN
+				@tipoResultado + '|' +								--IND_GRP_DRE
+				'|'													--NOTA_EXP_REF
+			,'')
 	--END
-	fetch next from Resultado_Cursor into @SPED_CODAGL, @SPED_IND_CTA, @SPED_NIVEL,@SPED_COD_NAT,@ACTDESCR,@Saldo,@TIPO, @tipoResultado
+	fetch next from Resultado_Cursor into @SPED_CODAGL, @SPED_COD_CTA_SUP, @SPED_IND_CTA, @SPED_NIVEL,@SPED_COD_NAT,@ACTDESCR,@Saldo,@TIPO, @tipoResultado, @correlativo
 end
 CLOSE Resultado_Cursor;  
 DEALLOCATE Resultado_Cursor;
