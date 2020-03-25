@@ -33,7 +33,7 @@ BEGIN
 		begin 
 			delete from spedtbl9000;
 			INSERT INTO spedtbl9000 (LINEA,seccion, datos) 
-					values(0, 'err', 'Verifique la versión de layout SPED en la configuración de compañía: ' + @layout + ' para el año: '+ convert(varchar(4), YEAR(@FechaHasta)));
+					values(0, 'err', 'Verifique la versión de layout SPED en la configuración de compañía. No existe para el año: '+ convert(varchar(4), YEAR(@FechaHasta)));
 		end
 END
 go
