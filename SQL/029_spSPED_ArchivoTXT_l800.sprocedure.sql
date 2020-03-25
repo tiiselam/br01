@@ -1,6 +1,3 @@
--- USE [GBRA]
--- GO
-
 IF EXISTS (
   SELECT * 
     FROM INFORMATION_SCHEMA.ROUTINES 
@@ -21,7 +18,7 @@ GO
 -- =========================================================================================================================
 
 create PROCEDURE [dbo].[SPED_ArchivoTXT_l800] 
-	@IdCompañia varchar (8),
+	@IdCompania varchar (8),
 	@FechaDesde varchar(10),
 	@FechaHasta varchar(10)
 AS
@@ -92,7 +89,7 @@ insert into spedtbl9000 (linea,seccion, datos)
 			rtrim(replace(convert(char,convert(datetime,@FechaHasta,102),103),'/',''))+'|' 
 	from dynamics.dbo.SY01500  com1 
 	left join SPEDtbl001 conf on com1.INTERID =conf.INTERID
-	where com1.INTERID =@IdCompañia
+	where com1.INTERID =@IdCompania
 --------------------------------------------------------------------------------
 --Inicio I050 Plano de Contas
 declare @docdate as DATETIME
@@ -653,7 +650,7 @@ INSERT INTO spedtbl9000 (LINEA,seccion, datos)
 		RTRIM(ltrim(conf.SPED_IND_RESP_LEGAL))+'|'	--IND_RESP_LEGAL
 		,'')	
 	 from SPEDtbl002 conf
-	 where conf.INTERID =@IdCompañia
+	 where conf.INTERID =@IdCompania
 set @contador=@contador+1
 INSERT INTO spedtbl9000 (LINEA,seccion, datos) 
 	values (@contador+1,
