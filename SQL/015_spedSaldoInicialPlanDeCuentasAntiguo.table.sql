@@ -1,7 +1,9 @@
 IF not EXISTS (SELECT 1 FROM dbo.sysobjects WHERE id = OBJECT_ID(N'dbo.spedSaldoInicialPlanDeCuentasAntiguo') AND OBJECTPROPERTY(id,N'IsTable') = 1)
 begin
 	CREATE TABLE [dbo].[spedSaldoInicialPlanDeCuentasAntiguo](
-		[Nat] varchar(50) not null,
+		gestion int not null default 2019,
+		mes int not null default 1,
+		[Nat] varchar(1) not null,
 		[CuentaAnterior] [varchar](50) not NULL,
 		[CentroCostoAnterior] [varchar](50) not NULL,
 		[Descripcion] [varchar](150) not NULL,
@@ -16,9 +18,12 @@ grant select, insert, update, delete on [dbo].[spedSaldoInicialPlanDeCuentasAnti
 go
 
 
+--Carga el mapeo del plan de cuentas antiguo con el nuevo. Se asume que el mes del saldo inicial es el 1.
 --   insert into spedSaldoInicialPlanDeCuentasAntiguo (nat, [CuentaAnterior],	[CentroCostoAnterior] ,	[Descripcion] ,	[SaldoIni], CuentaActual, CentroCostoActual)
 --   select nat, [CuentaAnterior],	[CentroCostoAnterior] ,	[Descripción] ,	[SaldoIni], CuentaActual, CentroCostoActual
 --   from [dbo]._tmpSaldoInicialPlanDeCuentasAntiguo
 
+-- select *
+-- from spedSaldoInicialPlanDeCuentasAntiguo
 
 

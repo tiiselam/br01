@@ -275,6 +275,7 @@ WHILE @@FETCH_STATUS = 0
 				on pc.cuentaSped+'.'+pc.cuentaGp = mapeo.CuentaActual
 				and pc.centroCostoGp = mapeo.CentroCostoActual
 			where mapeo.mes = @vper
+			and mapeo.gestion = @vanio
 		)
 
 		insert into spedtbl9000 (linea,seccion,datos)
