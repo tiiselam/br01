@@ -18,6 +18,8 @@ grant select, insert, update, delete on [dbo].[spedSaldoInicialPlanDeCuentasAnti
 go
 
 
+--drop table _tmpSaldoInicialPlanDeCuentasAntiguo
+
 --Carga el mapeo del plan de cuentas antiguo con el nuevo. Se asume que el mes del saldo inicial es el 1.
 --   insert into spedSaldoInicialPlanDeCuentasAntiguo (nat, [CuentaAnterior],	[CentroCostoAnterior] ,	[Descripcion] ,	[SaldoIni], CuentaActual, CentroCostoActual)
 --   select nat, [CuentaAnterior],	[CentroCostoAnterior] ,	[Descripción] ,	[SaldoIni], CuentaActual, CentroCostoActual
@@ -26,4 +28,16 @@ go
 -- select *
 -- from spedSaldoInicialPlanDeCuentasAntiguo
 
+--Validación
+-- select *
+-- from _tmpSaldoInicialPlanDeCuentasAntiguo mapeo
+-- left join vwSpedPlanDeCuentasGP pc
+-- 					on pc.cuentaSped+'.'+pc.cuentaGp = mapeo.CuentaActual
+-- 				and pc.centroCostoGp = mapeo.CentroCostoActual
+-- where pc.cuentaGp is null
 
+
+-- select *
+-- from GL00100
+-- where rtrim(ACTNUMBR_1)+'-'+rtrim(ACTNUMBR_2) in ( '30563-6459', '30591-6459', '30561-6459', '30601-8513')
+-- order by 2

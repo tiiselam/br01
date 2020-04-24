@@ -269,7 +269,7 @@ WHILE @@FETCH_STATUS = 0
 
 			union all
 
-			select mapeo.CuentaActual, mapeo.CentroCostoActual, 'I157' reg, nat, 0, 0, mapeo.SaldoIni, mapeo.SaldoIni
+			select mapeo.CuentaAnterior, mapeo.CentroCostoAnterior, 'I157' reg, nat, 0, 0, mapeo.SaldoIni, mapeo.SaldoIni
 			from [dbo].spedSaldoInicialPlanDeCuentasAntiguo mapeo
 				inner join dbo.vwSpedPlanDeCuentasGP pc
 				on pc.cuentaSped+'.'+pc.cuentaGp = mapeo.CuentaActual
