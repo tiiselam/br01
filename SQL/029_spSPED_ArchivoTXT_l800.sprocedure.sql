@@ -15,6 +15,7 @@ GO
 --			El campo SPED_CODAGL es el código agrupador. A partir del layour 8.00 no debe diferir del sped_cod_cuenta ya que usan el mismo código de nivel superior en J100 y J150
 --			El campo SPED_IND_CTA debe indicar el valor A cuando es el último nivel, S cuando es cualquier otro nivel
 --18/03/20 jcf Creación
+--15/04/20 jcf Agrega sección I157 Transferencia de saldos del plan de cuentas anterior
 -- =========================================================================================================================
 
 create PROCEDURE [dbo].[SPED_ArchivoTXT_l800] 
@@ -46,7 +47,7 @@ INSERT INTO spedtbl9000 (LINEA,seccion, datos)
 		'|0||'+CASE CONF.SPED_IDENT_MF WHEN 0 THEN 'N' ELSE 'S' END+							--- AS IDENT_MF C19
 		'|N|'+
         '0|'+                                                                                  --IND_CENTRALIZADA c21
-        '0|'+                                                                                  --IND_MUDANC_PC c22
+        '1|'+                                                                                  --IND_MUDANC_PC c22
         '1|'                                                                                   --COD_PLAN_REF c23
         ,'')
 			---SECCION 0000
@@ -245,8 +246,8 @@ WHILE @@FETCH_STATUS = 0
 			rtrim(replace(convert(char,convert(datetime,@vff,103),103),'/',''))+'|',''));
 
 		set @contador=@contador+1;
-		WITH SaldosPorCuentaSped (cuentaSped, centroCostoGp, debito, credito, perdblnc, saldo_acumulado) as (
-			select pc.cuentaSped+'.'+pc.cuentaGp, pc.centroCostoGp,	
+		WITH SaldosPorCuentaSped (cuentaSped, centroCostoGp, cuentaAnterior, CentroCostoAnterior, reg, naturaleza, debito, credito, perdblnc, saldo_acumulado) as (
+			select pc.cuentaSped+'.'+pc.cuentaGp, pc.centroCostoGp, '' cuentaAnterior, '' CentroCostoAnterior,	'I155' reg, '' naturaleza,
 				sum(res.debitamt + case when @vper=12 then isnull(acierre.debito, 0) else 0 end), 
 				sum(res.crdtamnt + case when @vper=12 then isnull(acierre.credito, 0) else 0 end), 
 				sum(res.perdblnc + case when @vper=12 then isnull(acierre.debito, 0) - isnull(acierre.credito, 0) else 0 end), 
@@ -265,11 +266,23 @@ WHILE @@FETCH_STATUS = 0
 			where res.year1 = @vanio
 			and res.periodid = @vper
 			group by pc.cuentaSped, pc.cuentaGp, pc.centroCostoGp
-			)
 
-			insert into spedtbl9000 (linea,seccion,datos)
-				select @contador+1,'I155',
-						isnull('|I155|'+						----REG
+			union all
+
+			select mapeo.CuentaActual, mapeo.CentroCostoActual, mapeo.CuentaAnterior, mapeo.CentroCostoAnterior, 'I157' reg, nat, 0, 0, mapeo.SaldoIni, mapeo.SaldoIni
+			from [dbo].spedSaldoInicialPlanDeCuentasAntiguo mapeo
+				inner join dbo.vwSpedPlanDeCuentasGP pc
+				on pc.cuentaSped+'.'+pc.cuentaGp = mapeo.CuentaActual
+				and pc.centroCostoGp = mapeo.CentroCostoActual
+			where mapeo.mes = @vper
+			and mapeo.gestion = @vanio
+		)
+
+		insert into spedtbl9000 (linea,seccion,datos)
+		select @contador+1,
+				reg,
+				case when reg = 'I155' then
+						isnull('|'+reg+'|'+						----REG
 						rtrim(ltrim(cuentaSped))+'|'+			----COD_CTA
 						rtrim(ltrim(centroCostoGp))+'|'+		---COD_CCUS
 						isnull(LTRIM(RTRIM(REPLACE(CAST(abs(cast(saldo_acumulado - perdblnc as decimal(18,2))) as nvarchar),'.',','))),'0,00')+'|'+	----VL_SLD_INI
@@ -279,13 +292,20 @@ WHILE @@FETCH_STATUS = 0
 						isnull(LTRIM(RTRIM(REPLACE(CAST(abs( cast(saldo_acumulado as decimal(18,2)) ) as nvarchar),'.',','))),'0,00')+'|'+			----VL_SLD_FIN
 						isnull(case when saldo_acumulado>0 then 'D' else 'C' end, 'D')+'|'															----IND_DC_FIN
 						,'')
-			--			)
+					else
+						'|'+reg+'|'+																							----REG
+						rtrim(cuentaAnterior) + '|'+
+						rtrim(CentroCostoAnterior) + '|'+
+						isnull(rTRIM(REPLACE(CAST(abs(cast(saldo_acumulado as decimal(18,2))) as nvarchar),'.',',')),'0,00')+'|'+	----VL_SLD_INI
+						naturaleza+'|'
+				end
 			--Select cuentaSped, centroCostoGp, debito, credito, perdblnc, saldo_acumulado
-			from SaldosPorCuentaSped
-			where isnull(debito, 0) != 0 
-			or isnull(credito, 0) != 0  
-			or isnull(perdblnc, 0) != 0 
-			or isnull(saldo_acumulado, 0) != 0 
+		from SaldosPorCuentaSped
+		order by cuentaSped, centroCostoGP, reg
+		-- where isnull(debito, 0) != 0 
+		-- 	or isnull(credito, 0) != 0  
+		-- 	or isnull(perdblnc, 0) != 0 
+		-- 	or isnull(saldo_acumulado, 0) != 0 
 
 		FETCH NEXT FROM periodos_cursor into @vanio,@vper,@vfi,@vff
 	end
