@@ -246,8 +246,8 @@ WHILE @@FETCH_STATUS = 0
 			rtrim(replace(convert(char,convert(datetime,@vff,103),103),'/',''))+'|',''));
 
 		set @contador=@contador+1;
-		WITH SaldosPorCuentaSped (cuentaSped, centroCostoGp, reg, naturaleza, debito, credito, perdblnc, saldo_acumulado) as (
-			select pc.cuentaSped+'.'+pc.cuentaGp, pc.centroCostoGp,	'I155' reg, '' naturaleza,
+		WITH SaldosPorCuentaSped (cuentaSped, centroCostoGp, cuentaAnterior, CentroCostoAnterior, reg, naturaleza, debito, credito, perdblnc, saldo_acumulado) as (
+			select pc.cuentaSped+'.'+pc.cuentaGp, pc.centroCostoGp, '' cuentaAnterior, '' CentroCostoAnterior,	'I155' reg, '' naturaleza,
 				sum(res.debitamt + case when @vper=12 then isnull(acierre.debito, 0) else 0 end), 
 				sum(res.crdtamnt + case when @vper=12 then isnull(acierre.credito, 0) else 0 end), 
 				sum(res.perdblnc + case when @vper=12 then isnull(acierre.debito, 0) - isnull(acierre.credito, 0) else 0 end), 
@@ -269,7 +269,7 @@ WHILE @@FETCH_STATUS = 0
 
 			union all
 
-			select mapeo.CuentaAnterior, mapeo.CentroCostoAnterior, 'I157' reg, nat, 0, 0, mapeo.SaldoIni, mapeo.SaldoIni
+			select mapeo.CuentaActual, mapeo.CentroCostoActual, mapeo.CuentaAnterior, mapeo.CentroCostoAnterior, 'I157' reg, nat, 0, 0, mapeo.SaldoIni, mapeo.SaldoIni
 			from [dbo].spedSaldoInicialPlanDeCuentasAntiguo mapeo
 				inner join dbo.vwSpedPlanDeCuentasGP pc
 				on pc.cuentaSped+'.'+pc.cuentaGp = mapeo.CuentaActual
@@ -294,8 +294,8 @@ WHILE @@FETCH_STATUS = 0
 						,'')
 					else
 						'|'+reg+'|'+																							----REG
-						rtrim(cuentaSped) + '|'+
-						rtrim(centroCostoGp) + '|'+
+						rtrim(cuentaAnterior) + '|'+
+						rtrim(CentroCostoAnterior) + '|'+
 						isnull(rTRIM(REPLACE(CAST(abs(cast(saldo_acumulado as decimal(18,2))) as nvarchar),'.',',')),'0,00')+'|'+	----VL_SLD_INI
 						naturaleza+'|'
 				end
