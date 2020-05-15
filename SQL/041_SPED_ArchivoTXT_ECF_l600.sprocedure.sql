@@ -14,6 +14,7 @@ GO
 --			Una cuenta local puede agrupar varias cuentas GP
 --			La jerarquía de cuentas locales debe estar en SPEDtbl004. 
 --24/03/20 jcf Creación
+--15/05/20 jcf Corrige sección 0990, L300
 -- =============================================
 CREATE PROCEDURE [dbo].[SPED_ArchivoTXT_ECF_l600] 
 	@IdCompania varchar (8),
@@ -106,15 +107,18 @@ BEGIN
 			FROM SPEDtbl002 conf
 			WHERE conf.INTERID =@IdCompania
 
+	select @contador = count(*)
+	from dbo.spedtbl9000
+	where seccion like '0%'
+
 	-- SECCION 0990
-	set @contador=@contador+1
 	INSERT INTO SPEDtbl9000 (linea
 							,seccion
 							,datos)	
 				values		(@contador+1
 							,'0990'
 							,isnull('|0990|'+	--- AS REG,
-									+ltrim(rtrim(cast(@contador+2 as varchar)))+'|',''))		--- AS QTD_LIN
+									+ltrim(rtrim(cast(@contador+1 as varchar)))+'|',''))		--- AS QTD_LIN
 
 	
 	--------------------------------------------------------
@@ -647,8 +651,8 @@ BEGIN
 			g.SPED_IND_CTA,
 			g.SPED_NIVEL,
 			g.SPED_COD_NAT,
-			g.SPED_COD_CTA_SUP,
 			g.ACTDESCR,
+			g.SPED_COD_CTA_SUP,
 			ABS(isnull(acumulados.saldo_acumulado, 0)) saldo,
 			case when acumulados.saldo_acumulado > 0 then 'D' else 'C' end tipo
 			--,			case when acumulados.saldo_acumulado > 0 then 'D' else 'R' end tipoResultado
