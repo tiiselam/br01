@@ -15,6 +15,7 @@ GO
 --			La jerarquía de cuentas locales debe estar en SPEDtbl004. 
 --24/03/20 jcf Creación
 --15/05/20 jcf Corrige sección 0990, L300
+--20/05/20 jcf Corrige sección l100, filtraba cuentas padre con saldo cero. Corrige sección k155, los débitos y créditos eran incorrectos.
 -- =============================================
 CREATE PROCEDURE [dbo].[SPED_ArchivoTXT_ECF_l600] 
 	@IdCompania varchar (8),
@@ -363,15 +364,13 @@ BEGIN
 				SELECT	pc.cuentaSped+'.'+pc.cuentaGp
 						,pc.cuentaRefSped
 						,pc.centroCostoGp
-						,SUM(case when res.periodid=0 then 0  else res.debitamt end + case when res.periodid=12 then isnull(acierre.debito, 0) else 0 end) debito
-						,SUM(case when res.periodid=0 then 0  else res.crdtamnt end + case when res.periodid=12 then isnull(acierre.credito, 0) else 0 end) credito
+						, SUM(res.debitamt) debito
+						, SUM(res.crdtamnt) credito
+						--,SUM(case when res.periodid=0 then 0  else res.debitamt end + case when res.periodid=12 then isnull(acierre.debito, 0) else 0 end) debito
+						--,SUM(case when res.periodid=0 then 0  else res.crdtamnt end + case when res.periodid=12 then isnull(acierre.credito, 0) else 0 end) credito
+						--,SUM(case when res.periodid=12 then isnull(acierre.debito, 0) - isnull(acierre.credito, 0) + res.saldo_acumulado else 0 end) saldo_final
 						,SUM(case when res.periodid=0 then res.saldo_acumulado  else 0 end) saldo_inicial
-						,SUM(case when res.periodid=12 then isnull(acierre.debito, 0) - isnull(acierre.credito, 0) + res.saldo_acumulado else 0 end) saldo_final
-						--El CODIGO COMENTADO SIRVE SI LA APERTURA ES POR PERIORO.
-						--,SUM(res.debitamt + case when @periodo=12 then isnull(acierre.debito, 0) else 0 end)
-						--,SUM(res.crdtamnt + case when @periodo=12 then isnull(acierre.credito, 0) else 0 end)
-						--,SUM(res.perdblnc + case when @periodo=12 then isnull(acierre.debito, 0) - isnull(acierre.credito, 0) else 0 end)
-						--,SUM(res.saldo_acumulado + case when @periodo=12 then isnull(acierre.debito, 0) - isnull(acierre.credito, 0) else 0 end)
+						, SUM(case when res.periodid=12 then res.saldo_acumulado else 0 end) saldo_final
 				FROM	dbo.vwSpedPlanDeCuentasGP pc
 						inner join spedtbl004 SP on SP.SPED_COD_CTA = pc.cuentaSped
 						inner join dbo.vwResumenDeCuentaAcumulado res	on pc.actindx = res.actindx
@@ -384,7 +383,6 @@ BEGIN
 									and p.centroCostoGp = pc.centroCostoGp
 									) acierre
 				WHERE res.year1 = @anio
-				--and res.periodid = @periodo
 				and SP.SPED_COD_NAT in('01','02','03')
 				GROUP BY pc.cuentaSped, pc.cuentaGp, pc.cuentaRefSped, pc.centroCostoGp)
 				ORDER BY cuentaSped
@@ -611,7 +609,7 @@ BEGIN
 					and ltrim(rtrim(sc.sped_codagl)) like ltrim(rtrim(g.sped_codagl)) +'%'
 					) gestionAnterior
 		WHERE G.SPED_COD_NAT IN ('01','02','03')
-		and abs(isnull(gestionActual.Saldo_Acumulado, 0)) + ABS(isnull(gestionAnterior.saldo_acumulado, 0)) != 0
+		and abs(isnull(gestionActual.Saldo_Acumulado, 0)) + ABS(isnull(gestionAnterior.saldo_acumulado, 0)) + abs(isnull(gestionanio.credito, 0)) + abs(isnull(gestionanio.debito, 0)) != 0
 		)
 
 	OPEN Balance_cursor
