@@ -14,6 +14,9 @@ GO
 --			Una cuenta local puede agrupar varias cuentas GP
 --			La jerarquía de cuentas locales debe estar en SPEDtbl004. 
 --24/03/20 jcf Creación
+--15/05/20 jcf Corrige sección 0990, L300
+--20/05/20 jcf Corrige sección l100, filtraba cuentas padre con saldo cero. Corrige sección k155, los débitos y créditos eran incorrectos.
+--25/05/20 jcf Corrige sección k155, y k156. Los débitos, créditos y saldo final no incluían el resultado de la gestión para la cuenta de resultados acumulados.
 -- =============================================
 CREATE PROCEDURE [dbo].[SPED_ArchivoTXT_ECF_l600] 
 	@IdCompania varchar (8),
@@ -106,15 +109,18 @@ BEGIN
 			FROM SPEDtbl002 conf
 			WHERE conf.INTERID =@IdCompania
 
+	select @contador = count(*)
+	from dbo.spedtbl9000
+	where seccion like '0%'
+
 	-- SECCION 0990
-	set @contador=@contador+1
 	INSERT INTO SPEDtbl9000 (linea
 							,seccion
 							,datos)	
 				values		(@contador+1
 							,'0990'
 							,isnull('|0990|'+	--- AS REG,
-									+ltrim(rtrim(cast(@contador+2 as varchar)))+'|',''))		--- AS QTD_LIN
+									+ltrim(rtrim(cast(@contador+1 as varchar)))+'|',''))		--- AS QTD_LIN
 
 	
 	--------------------------------------------------------
@@ -345,7 +351,6 @@ BEGIN
 										rtrim(replace(convert(char,@fechainicio,103),'/',''))+'|'+
 										rtrim(replace(convert(char,@fechafin,103),'/',''))+'|'+
 										'A'+RIGHT(RTRIM('00' + convert(char,@periodo)),2)+ '|'
-										--'A'+convert(char,@periodo)+ '|'
 										,''))
 
 		set @contador=@contador+1;
@@ -359,35 +364,50 @@ BEGIN
 				SELECT	pc.cuentaSped+'.'+pc.cuentaGp
 						,pc.cuentaRefSped
 						,pc.centroCostoGp
-						,SUM(case when res.periodid=0 then 0  else res.debitamt end + case when res.periodid=12 then isnull(acierre.debito, 0) else 0 end) debito
-						,SUM(case when res.periodid=0 then 0  else res.crdtamnt end + case when res.periodid=12 then isnull(acierre.credito, 0) else 0 end) credito
+						, SUM(case when res.periodid = 0 
+									then 0 
+									else res.debitamt 
+									end
+							+ case when isnull(resActual.resultado, 0) > 0 
+									then resActual.resultado
+									else 0 
+									end) debito
+						, SUM(case when res.periodid = 0 
+									then 0 
+									else res.crdtamnt 
+									end
+							+ case when isnull(resActual.resultado, 0) < 0 
+									then abs(resActual.resultado)
+									else 0 
+									end) credito
 						,SUM(case when res.periodid=0 then res.saldo_acumulado  else 0 end) saldo_inicial
-						,SUM(case when res.periodid=12 then isnull(acierre.debito, 0) - isnull(acierre.credito, 0) + res.saldo_acumulado else 0 end) saldo_final
-						--El CODIGO COMENTADO SIRVE SI LA APERTURA ES POR PERIORO.
-						--,SUM(res.debitamt + case when @periodo=12 then isnull(acierre.debito, 0) else 0 end)
-						--,SUM(res.crdtamnt + case when @periodo=12 then isnull(acierre.credito, 0) else 0 end)
-						--,SUM(res.perdblnc + case when @periodo=12 then isnull(acierre.debito, 0) - isnull(acierre.credito, 0) else 0 end)
-						--,SUM(res.saldo_acumulado + case when @periodo=12 then isnull(acierre.debito, 0) - isnull(acierre.credito, 0) else 0 end)
+						,SUM(case when res.periodid=12 
+								then res.saldo_acumulado 
+								else 0 
+								end
+							+ isnull(resActual.resultado, 0)
+							) saldo_final
 				FROM	dbo.vwSpedPlanDeCuentasGP pc
 						inner join spedtbl004 SP on SP.SPED_COD_CTA = pc.cuentaSped
 						inner join dbo.vwResumenDeCuentaAcumulado res	on pc.actindx = res.actindx
-						outer apply (SELECT case when p.tipoSaldo_acumulado='D' then abs(p.Saldo_Acumulado) else 0 end debito,
-											case when p.tipoSaldo_acumulado='C' then abs(p.Saldo_Acumulado) else 0 end credito,
-											tipoSaldo_acumulado
-									FROM dbo.fSpedAsientoDeCierre (res.year1) p
-									WHERE p.cuentaSped = pc.cuentaSped
-									and p.cuentaGp = pc.cuentaGp
-									and p.centroCostoGp = pc.centroCostoGp
-									) acierre
+						outer apply (
+									select sum(ac.saldo_acumulado) resultado
+									from dbo.vwResumenDeCuentaAcumulado ac
+										inner join dbo.GL40000 ctau
+										on ctau.rerindx = pc.actindx
+									where ac.YEAR1 = res.year1
+									and ac.PERIODID = 12
+									and ac.periodid = res.periodid
+									and ac.PSTNGTYP = 1	--resultado
+									) resActual
 				WHERE res.year1 = @anio
-				--and res.periodid = @periodo
 				and SP.SPED_COD_NAT in('01','02','03')
-				GROUP BY pc.cuentaSped, pc.cuentaGp, pc.cuentaRefSped, pc.centroCostoGp)
+				GROUP BY pc.cuentaSped, pc.cuentaGp, pc.cuentaRefSped, pc.centroCostoGp
+				)
 				ORDER BY cuentaSped
 
-        --WITH SaldosPorCuentaSped (cuentaSped, centroCostoGp, debito, credito, perdblnc, saldo_acumulado) as (
 		OPEN SaldosPorCuentaSped
-		FETCH NEXT FROM SaldosPorCuentaSped into @sped_cod_cta,  @cuentaRefSped, @centroCostoGp,@debito, @credito, @perdblnc, @saldo_acumulado
+		FETCH NEXT FROM SaldosPorCuentaSped into @sped_cod_cta,  @cuentaRefSped, @centroCostoGp, @debito, @credito, @perdblnc, @saldo_acumulado
 	
 		WHILE @@fetch_status =0
 		BEGIN
@@ -401,41 +421,34 @@ BEGIN
 								rtrim(ltrim(@sped_cod_cta))+'|'+			----COD_CTA
 								rtrim(ltrim(@centroCostoGp))+'|'+		---COD_CCUS
 								isnull(LTRIM(RTRIM(REPLACE(CAST(abs(cast(@perdblnc as decimal(18,2))) as nvarchar),'.',','))),'0,00')+'|'+	--VL_SLD_INI
-								isnull(case when @perdblnc > 0 then 'D' else 'C' end, 'D')+'|'+	--IND_DC_INI
-								-- EL CODIGO COMENTADO SIRVE SI SE ABRE POR PERIODO
-								--isnull(LTRIM(RTRIM(REPLACE(CAST(abs(cast(saldo_acumulado - perdblnc as decimal(18,2))) as nvarchar),'.',','))),'0,00')+'|'+	----VL_SLD_INI		----VL_SLD_INI
-								--isnull(case when saldo_acumulado - perdblnc > 0 then 'D' else 'C' end, 'D')+'|'+			----IND_DC_INI
+								case when isnull(@perdblnc, 0) >= 0 then 'D' else 'C' end+'|'+	--IND_DC_INI
 								REPLACE(LTRIM(RTRIM(cast(convert(decimal(18,2),isnull(@debito,0)) AS nvarchar))),'.',',')+'|'+ --VL_DEB
 								REPLACE(LTRIM(RTRIM(cast(convert(decimal(18,2),isnull(@credito,0)) AS nvarchar))),'.',',')+'|'+ --VL_CRED
 								isnull(LTRIM(RTRIM(REPLACE(CAST(abs( cast(@saldo_acumulado as decimal(18,2)) ) as nvarchar),'.',','))),'0,00')+'|'+			----VL_SLD_FIN
-								isnull(case when @saldo_acumulado>0 then 'D' else 'C' end, 'D')+'|'			----IND_DC_FIN
+								case when isnull(@saldo_acumulado, 0) >= 0 then 'D' else 'C' end+'|'			----IND_DC_FIN
 								,'')					
-					--FROM SaldosPorCuentaSped
-					--WHERE 
-					--ORDER BY cuentaSped
+				
 				set @contador=@contador+1
+
 				INSERT INTO SPEDtbl9000 (linea,seccion,datos)
 					SELECT	@contador+1
 							,'K156'
 							,isnull('|K156|'+
 									@cuentaRefSped+'|'+
 									isnull(LTRIM(RTRIM(REPLACE(CAST(abs(cast(@perdblnc as decimal(18,2))) as nvarchar),'.',','))),'0,00')+'|'+	--VL_SLD_INI
-									isnull(case when @perdblnc > 0 then 'D' else 'C' end, 'D')+'|'+	--IND_DC_INI
-									--	EL CODIGO COMENTADO SIRVE SI SE ABRE POR PERIODO
-									--isnull(LTRIM(RTRIM(REPLACE(CAST(abs(cast(saldo_acumulado - perdblnc as decimal(18,2))) as nvarchar),'.',','))),'0,00')+'|'+	----VL_SLD_INI		----VL_SLD_INI
-									--isnull(case when saldo_acumulado - perdblnc > 0 then 'D' else 'C' end, 'D')+'|'+			----IND_DC_INI
+									case when isnull(@perdblnc, 0) >= 0 then 'D' else 'C' end +'|'+	--IND_DC_INI
 							        REPLACE(LTRIM(RTRIM(cast(convert(decimal(18,2),isnull(@debito,0)) AS nvarchar))),'.',',')+'|'+			----VL_DEB
 							        REPLACE(LTRIM(RTRIM(cast(convert(decimal(18,2),isnull(@credito,0)) AS nvarchar))),'.',',')+'|'+			----VL_CRED
 							        isnull(LTRIM(RTRIM(REPLACE(CAST(abs( cast(@saldo_acumulado as decimal(18,2)) ) as nvarchar),'.',','))),'0,00')+'|'+			----VL_SLD_FIN
-							        isnull(case when @saldo_acumulado>0 then 'D' else 'C' end, 'D')+'|'			----IND_DC_FIN
+							        case when isnull(@saldo_acumulado, 0) >= 0 then 'D' else 'C' end + '|'			----IND_DC_FIN
 									,'')
 			END
-			FETCH NEXT FROM SaldosPorCuentaSped into @sped_cod_cta,  @cuentaRefSped, @centroCostoGp,@debito, @credito, @perdblnc, @saldo_acumulado
+			FETCH NEXT FROM SaldosPorCuentaSped into @sped_cod_cta,  @cuentaRefSped, @centroCostoGp, @debito, @credito, @perdblnc, @saldo_acumulado
 		END
 		CLOSE SaldosPorCuentaSped;  
 		DEALLOCATE SaldosPorCuentaSped;
 
-		FETCH NEXT FROM periodos_cursor into @anio,@periodo,@fechainicio,@fechafin
+		FETCH NEXT FROM periodos_cursor into @anio, @periodo, @fechainicio, @fechafin
 	END
 	CLOSE periodos_cursor;  
 	DEALLOCATE periodos_cursor;
@@ -535,7 +548,6 @@ BEGIN
 
 	DECLARE Balance_cursor cursor for
 		(SELECT		
-			--RTRIM(g.SPED_CODAGL),
 			g.SPED_COD_CTA,
 			g.SPED_IND_CTA,
 			g.SPED_NIVEL,
@@ -543,12 +555,12 @@ BEGIN
 			g.SPED_COD_CTA_SUP,
 			g.ACTDESCR,
 			abs(gestionAnterior.Saldo_Acumulado) saldoInicial,
-			case when gestionAnterior.Saldo_Acumulado > 0
+			case when isnull(gestionAnterior.Saldo_Acumulado, 0) >= 0
 					then 'D' else 'C' end tipoSaldoInicial,
 			gestionanio.credito,
 			gestionanio.debito,
 			abs(gestionActual.saldo_acumulado) saldoFinal,
-			case when gestionActual.saldo_acumulado > 0
+			case when isnull(gestionActual.saldo_acumulado, 0) >= 0
 					then 'D' else 'C' 	end tipoSaldoFinal
 		FROM SPEDtbl004 g
 		outer apply (select b.cuentaSped, sc.SPED_CODAGL
@@ -572,8 +584,9 @@ BEGIN
 					select sum(ac.perdblnc) perdblnc, 
 							sum(ac.saldo_acumulado) 
 								+ case when (utilidadr.SPED_CODAGL like ltrim(rtrim(g.SPED_CODAGL)) + '%')
-						--and ac.HISTORYR = 0 --open
-										then resActual.resultado else 0 end saldo_acumulado
+										then resActual.resultado 
+										else 0 
+										end saldo_acumulado
 					from dbo.vwResumenDeCuentaAcumulado ac
 						inner join dbo.vwSpedPlanDeCuentasGP pc 	on pc.actindx=ac.ACTINDX
 						inner join SPEDtbl004 sc 	on sc.SPED_COD_CTA = pc.cuentaSped
@@ -582,18 +595,23 @@ BEGIN
 					and ltrim(rtrim(sc.sped_codagl)) like ltrim(rtrim(g.sped_codagl)) +'%'
 					) gestionActual
 		outer apply (
-					select sum(DEBITAMT) debito, 
+					select	sum(DEBITAMT) 
+								+ case when resActual.resultado > 0 and (utilidadr.SPED_CODAGL like ltrim(rtrim(g.SPED_CODAGL)) + '%')
+										then resActual.resultado
+										else 0 
+										end debito,
 							sum(CRDTAMNT)
-								+ case when (utilidadr.SPED_CODAGL like ltrim(rtrim(g.SPED_CODAGL)) + '%')
-						--and ac.HISTORYR = 0 --open
-										then resActual.resultado else 0 end   credito
+								+ case when resActual.resultado < 0 and (utilidadr.SPED_CODAGL like ltrim(rtrim(g.SPED_CODAGL)) + '%')
+										then abs(resActual.resultado)
+										else 0 
+										end credito
 					from dbo.vwResumenDeCuentaAcumulado ac
 						inner join dbo.vwSpedPlanDeCuentasGP pc 	on pc.actindx=ac.ACTINDX
 						inner join SPEDtbl004 sc 	on sc.SPED_COD_CTA = pc.cuentaSped
 					where ac.YEAR1 = @vanio
-			--and ac.PERIODID = 12
+					and ac.PERIODID != 0
 					and ltrim(rtrim(sc.sped_codagl)) like ltrim(rtrim(g.sped_codagl)) +'%'
-					) gestionanio
+					) gestionAnio
 		outer apply (
 					select sum(ac.perdblnc) perdblnc, 
 							sum(ac.saldo_acumulado) 
@@ -607,7 +625,7 @@ BEGIN
 					and ltrim(rtrim(sc.sped_codagl)) like ltrim(rtrim(g.sped_codagl)) +'%'
 					) gestionAnterior
 		WHERE G.SPED_COD_NAT IN ('01','02','03')
-		and abs(isnull(gestionActual.Saldo_Acumulado, 0)) + ABS(isnull(gestionAnterior.saldo_acumulado, 0)) != 0
+		and abs(isnull(gestionActual.Saldo_Acumulado, 0)) + ABS(isnull(gestionAnterior.saldo_acumulado, 0)) + abs(isnull(gestionanio.credito, 0)) + abs(isnull(gestionanio.debito, 0)) != 0
 		)
 
 	OPEN Balance_cursor
@@ -630,8 +648,8 @@ BEGIN
 									isnull(rtrim(@SPED_COD_CTA_SUP),'')+'|'+
 									isnull(ltrim(rtrim(REPLACE(cast(convert(decimal(18,2),@inicial) as nvarchar),'.',','))),'0,00')+'|'+
 									@tipoinicial+'|'+
-									isnull(ltrim(rtrim(REPLACE(cast(convert(decimal(18,2),@credito) as nvarchar),'.',','))),'0,00')+'|'+
 									isnull(ltrim(rtrim(REPLACE(cast(convert(decimal(18,2),@debito) as nvarchar),'.',','))),'0,00')+'|'+
+									isnull(ltrim(rtrim(REPLACE(cast(convert(decimal(18,2),@credito) as nvarchar),'.',','))),'0,00')+'|'+
 									isnull(ltrim(rtrim(REPLACE(cast(convert(decimal(18,2),@final) as nvarchar),'.',','))),'0,00')+'|'+
 									@tipofinal+'|','|')
 		END
@@ -647,8 +665,8 @@ BEGIN
 			g.SPED_IND_CTA,
 			g.SPED_NIVEL,
 			g.SPED_COD_NAT,
-			g.SPED_COD_CTA_SUP,
 			g.ACTDESCR,
+			g.SPED_COD_CTA_SUP,
 			ABS(isnull(acumulados.saldo_acumulado, 0)) saldo,
 			case when acumulados.saldo_acumulado > 0 then 'D' else 'C' end tipo
 			--,			case when acumulados.saldo_acumulado > 0 then 'D' else 'R' end tipoResultado
